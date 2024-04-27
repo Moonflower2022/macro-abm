@@ -3,7 +3,7 @@ from .model import MacroModel
 
 LOANS_COLOR = "#2ca02c"
 TOTAL_CASH_COLOR = "#d62728"
-TOTAL_DEPOSITS_COLOR = "#f14b5a"
+TOTAL_DEPOSITS_COLOR = "#3a2b81"
 CASH_COLORS = [
     "#2596be",
     "#e28743",
