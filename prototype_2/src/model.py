@@ -13,13 +13,7 @@ def get_hh_money(model):
 class MacroModel(mesa.Model):
     agent_num = 4
 
-    house_cost = 360
-    rent = 20
-    utilities_cost = 3
-    goods_cost = 5
-    incomes = [30, 35, 40]
-    annual_interest_rate = 0.005
-    annual_morgage_rate = 0.035
+    household_incomes = [35, 40, 45]
 
     def __init__(self, total_steps=100):
         super().__init__()
@@ -28,9 +22,9 @@ class MacroModel(mesa.Model):
         self.schedule = RandomActivation(self)
 
         id_giver = itertools.count(1)
-        self.schedule.add(Bank(next(id_giver), self, self.annual_interest_rate))
+        self.schedule.add(Bank(next(id_giver), self))
         for i in range(3):
-            self.schedule.add(Household(next(id_giver), self, self.house_cost, self.utilities_cost, self.rent, self.incomes[i]))
+            self.schedule.add(Household(next(id_giver), self, self.household_incomes[i]))
 
         # Data collector
         self.datacollector = DataCollector(
