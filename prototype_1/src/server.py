@@ -14,7 +14,8 @@ CASH_COLORS = [
 chart = mesa.visualization.ChartModule(
     [
         {"Label": "Bank Money", "Color": LOANS_COLOR},
-        {"Label": "Total Cash", "Color": TOTAL_CASH_COLOR}
+        {"Label": "Total Cash", "Color": TOTAL_CASH_COLOR},
+        {"Label": "Total Deposits", "Color": TOTAL_DEPOSITS_COLOR}
     ]
 )
 
