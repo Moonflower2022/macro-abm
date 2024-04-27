@@ -12,8 +12,10 @@ def find(model, agent_class):
     if len(agents) > 1:
         print(f"Warning: there are multiple {agent_class.__name__} in this model")
         return agents
-    # len(banks) == 1
-    return agents[0]
+    elif len(agents) == 1:
+        return agents[0]
+    # len(agents) == 0
+    raise Exception(f"uh oh none of agent {agent_class.__name__} found in model")
 
 def time_due(counter, start, interval):
     return (counter - start) % interval == 0
@@ -28,6 +30,8 @@ class Bank(mesa.Agent):
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
+
+        self.government = find(model, Government)
 
     def loan(self, household, amount):
         household.money += amount
@@ -64,14 +68,15 @@ class Household(mesa.Agent):
     
     rent_interval = 4
     mortgage_interval = 4
+    utilities_interval = 4
 
     strategy = "rent"
     strategy_start = 0
     counter = 0
 
     house_cost = 360
-    utilities_cost = 3
-    rent = 20
+    rent = 15
+    utilities_cost = rent / 5
     goods_cost = 5
     mortgage_cost = 30
     annual_morgage_rate = 0.035
@@ -82,17 +87,24 @@ class Household(mesa.Agent):
 
         self.model = model
         self.bank = find(model, Bank)
+        self.government = find(model, Government)
 
     def step(self):
         if self.strategy == "rent" and time_due(self.counter, self.strategy_start, self.rent_interval):
-            self.bank.money += self.rent
             self.money -= self.rent
+            self.bank.money += self.rent - self.utilities_cost
+            # bank should pay 20% of the rent to the government
+            self.government += self.utilities_cost
 
         if self.strategy[:8] == "mortgage" and time_due(self.counter, self.strategy_start, self.mortgage_interval):
-            self.money -= self.mortgage_cost * (1 + self.annual_morgage_rate) ** ((self.counter - self.strategy_start) / 4)
+            mortgage_after_interest = self.mortgage_cost * (1 + self.annual_morgage_rate) ** ((self.counter - self.strategy_start) / 4)
+            self.money -= mortgage_after_interest
+            self.bank.money += mortgage_after_interest - self.utilities_cost
+            self.government.money += self.utilities_cost
 
-        if self.strategy == "own house":
+        if self.strategy == "own house" and time_due(self.counter, self.strategy_start, self.utilities_interval):
             self.money -= self.utilities_cost
+            self.government.money += self.utilities_cost
 
         if self.strategy[:8] == "mortgage":
             if (self.counter - self.strategy_start) / 4 >= {"A": 3, "B": 6, "C": 9}[self.strategy[9]]:
@@ -122,6 +134,13 @@ class Household(mesa.Agent):
             self.strategy_start = self.counter
 
         self.counter += 1
+
+class Government(mesa.Agent):
+    money = 500
+
+    def __init__(self, unique_id, model):
+        super().__init__(unique_id, model)
+
 
 class Firm(mesa.Agent):
 
