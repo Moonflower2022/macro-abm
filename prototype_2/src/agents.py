@@ -3,6 +3,18 @@ import mesa
 
 # 1 tick is a week
 
+def find(model, agent_class):
+    agents = []
+    for agent in model.schedule.agents:
+        if isinstance(agent, agent_class):
+            agents.append(agent)
+
+    if len(agents) > 1:
+        print(f"Warning: there are multiple {agent_class.__name__} in this model")
+        return agents
+    # len(banks) == 1
+    return agents[0]
+
 class Bank(mesa.Agent):
     money = 500
     loan_ticks = 8
@@ -15,7 +27,7 @@ class Bank(mesa.Agent):
         self.annual_interest_rate = annual_interest_rate
 
     def loan(self, household, amount):
-        household.cash += amount
+        household.money += amount
         self.money -= amount
         self.loan_info.append({
             "household": household,
@@ -24,13 +36,13 @@ class Bank(mesa.Agent):
         })
 
     def demand_loan(self, info):
-        if info["amount"] <= info["household"].cash:
+        if info["amount"] <= info["household"].money:
             self.money += info["amount"]
-            info["household"].cash -= info["amount"]
+            info["household"].money -= info["amount"]
         else:
-            self.money += info["household"].cash
-            info["household"].cash = 0
-            print(f"household {info['household'].unique_id} defaulted on loan of {info['amount']}")
+            print(f"household {info['household'].unique_id} defaulted on loan of {info['amount']}, could only pay back {info['household'].money}")
+            self.money += info["household"].money
+            info["household"].money = 0
             
         self.loan_info.remove(info)
 
@@ -45,14 +57,14 @@ class Bank(mesa.Agent):
 
     
 class Household(mesa.Agent):
-    cash = 20
+    money = 20
     deposit = 0
     counter = 0
     rent_interval = 4
     strategy = "rent"
     strategy_start = 0
 
-    def __init__(self, unique_id, model, bank, house_cost, utilities_cost, rent, income):
+    def __init__(self, unique_id, model, house_cost, utilities_cost, rent, income):
         super().__init__(unique_id, model)
 
         self.house_cost = house_cost
@@ -61,20 +73,25 @@ class Household(mesa.Agent):
         self.income = income
 
         self.model = model # isnt used right now
-        self.bank = bank
+        self.bank = find(model, Bank)
 
     def step(self):
         if self.strategy == "rent" and (self.counter - self.strategy_start) % self.rent_interval == 0:
             self.bank.money += self.rent
-            self.cash -= self.rent
+            self.money -= self.rent
 
-        if self.cash < 15:
-            needed_cash = 15 - self.cash
+        if self.money < 15:
+            needed_money = 15 - self.money
 
-            if self.bank.money >= needed_cash:
-                self.bank.loan(self, needed_cash)
+            if self.bank.money >= needed_money:
+                self.bank.loan(self, needed_money)
 
         self.counter += 1
 
 class Firm(mesa.Agent):
-    pass
+
+
+
+    def __init__(self, unique_id, model):
+        super().__init__(unique_id, model)
+
