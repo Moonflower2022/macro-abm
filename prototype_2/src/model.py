@@ -7,9 +7,6 @@ import itertools
 def get_money(model):
     return sum(agent.money for agent in model.schedule.agents if isinstance(agent, Bank))
 
-def get_deposits(model):
-    return sum(sum(deposit_info["amount"] for deposit_info in agent.deposits.values()) for agent in model.schedule.agents if isinstance(agent, Bank))
-
 def get_cash(model):
     return sum(agent.cash for agent in model.schedule.agents if isinstance(agent, Household))
 
@@ -19,7 +16,7 @@ class MacroModel(mesa.Model):
     house_cost = 360
     rent = 20
     utilities_cost = 5
-    incomes = [25, 30, 35]
+    incomes = [30, 35, 40]
     annual_interest_rate = 0.005
     annual_morgage_rate = 0.035
 
@@ -39,7 +36,6 @@ class MacroModel(mesa.Model):
         self.datacollector = DataCollector(
             {
                 "Bank Money": get_money, 
-                "Total Deposits": get_deposits,
                 "Total Cash": get_cash,
                 "Cash 1": lambda model: sum(agent.cash for agent in model.schedule.agents if isinstance(agent, Household) and agent.unique_id == 2),
                 "Cash 2": lambda model: sum(agent.cash for agent in model.schedule.agents if isinstance(agent, Household) and agent.unique_id == 3),

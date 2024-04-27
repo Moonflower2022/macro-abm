@@ -49,7 +49,6 @@ class Household(mesa.Agent):
     deposit = 0
     counter = 0
     rent_interval = 4
-    compound_interval = 4
     strategy = "rent"
     strategy_start = 0
 
