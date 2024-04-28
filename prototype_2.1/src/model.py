@@ -2,19 +2,23 @@ import mesa
 from mesa.time import BaseScheduler
 from mesa.datacollection import DataCollector
 from .agents import Household, Bank, Government, Firm
+from .utils import get, get_all
 import itertools
 
 def get_bank_money(model):
-    return sum(agent.money for agent in model.schedule.agents if isinstance(agent, Bank))
+    return get(model, Bank).money
 
 def get_government_money(model):
-    return sum(agent.money for agent in model.schedule.agents if isinstance(agent, Government))
+    return get(model, Government).money
 
 def get_firm_money(model):
-    return sum(agent.money for agent in model.schedule.agents if isinstance(agent, Firm))
+    return get(model, Firm).money
 
-def get_hh_money(model):
-    return sum(agent.money for agent in model.schedule.agents if isinstance(agent, Household))
+def get_household_money(model):
+    return sum(household.money for household in get_all(model, Household))
+
+def get_household_deposits(model):
+    return sum(info["amount"] for info in get(model, Bank).deposits.values())
 
 class MacroModel(mesa.Model):
     household_num = 3
@@ -47,7 +51,8 @@ class MacroModel(mesa.Model):
             "Bank Money": get_bank_money, 
             "Firm Money": get_firm_money,
             "Government Money": get_government_money,
-            "Total Household Money": get_hh_money
+            "Total Household Money": get_household_money,
+            "Total Household Deposits": get_household_deposits,
         })
 
         self.datacollector = DataCollector(data_collectors)

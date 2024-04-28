@@ -1,33 +1,13 @@
-import random
 import mesa
+from .utils import get, get_all, time_due
 
 # 1 tick is a week
-
-def get_all(model, agent_class):
-    agents = []
-    for agent in model.schedule.agents:
-        if isinstance(agent, agent_class):
-            agents.append(agent)
-
-    if len(agents) > 0:
-        return agents
-    # len(agents) == 0
-    raise Exception(f"uh oh none of agent {agent_class.__name__} found in model")
-
-
-def get(model, agent_class):
-    for agent in model.schedule.agents:
-        if isinstance(agent, agent_class):
-            return agent
-    raise Exception(f"uh oh none of agent {agent_class.__name__} found in model")
-
-def time_due(model, start, interval):
-    return (model.schedule.time - start) % interval == 0
 
 class Bank(mesa.Agent):
     money = 500
     loan_ticks = 8
     loan_info = []
+    deposits = {}
 
     monthly_interest_rate = 0.005
     compound_interval = 4
@@ -45,7 +25,10 @@ class Bank(mesa.Agent):
         })
 
     def demand_loan(self, info):
-        if info["amount"] <= info["household"].money:
+        if info["amount"] <= self.deposits[info["household"].unique_id]["amount"]:
+            self.money += info["amount"]
+            self.deposits[info["household"].unique_id]["amount"] -= info["amount"]
+        elif info["amount"] <= info["household"].money:
             self.money += info["amount"]
             info["household"].money -= info["amount"]
         else:
@@ -55,6 +38,29 @@ class Bank(mesa.Agent):
             
         self.loan_info.remove(info)
 
+    def deposit(self, household, amount):
+        if household.unique_id in self.deposits:
+            self.deposits[household.unique_id]["amount"] += amount
+            household.money -= amount
+        else:
+            self.deposits[household.unique_id] = {
+                "amount": amount,
+                "start": household.model.schedule.time
+            }
+
+    def withdraw(self, household, amount):
+        if household.unique_id in self.deposits:
+            if amount == "all":
+                household.money += self.deposits[household.unique_id]["amount"]
+                self.deposits[household.unique_id]["amount"] = 0
+                return
+            if amount < self.deposits[household.unique_id]["amount"]:
+                household.money += amount
+                self.deposits[household.unique_id]["amount"] -= amount
+                return
+            raise Exception("household is withdrawing more money than it can")                
+        raise Exception("household is trying to withdraw from bank when it doesnt have any deposit money in its name")
+        
 
     def step(self):
         for info in self.loan_info:
@@ -63,8 +69,16 @@ class Bank(mesa.Agent):
                 info["amount"] *= 1 + self.monthly_interest_rate
             if info["weeks"] > self.loan_ticks:
                 self.demand_loan(info)
+        for info in self.deposits.values():
+            if time_due(self.model, info["start"], self.compound_interval):
+                compound_addition = info["amount"] * self.monthly_interest_rate
+                if self.money > compound_addition:
+                    self.money -= compound_addition
+                    info["amount"] += compound_addition
+                else:
+                    raise Exception("bank defaulted :(")
+                
 
-    
 class Household(mesa.Agent):
     money = 20
     
@@ -106,6 +120,7 @@ class Household(mesa.Agent):
         self.government.money += self.utilities_cost
 
     def buy_house(self):
+        self.bank.withdraw(self, "all")
         if self.money >= 360:
             self.strategy = "own house"
             self.money -= 360
@@ -136,6 +151,12 @@ class Household(mesa.Agent):
             if (self.model.schedule.time - self.strategy_start) / 4 >= {"A": 3, "B": 6, "C": 9}[self.strategy[9]]:
                 self.strategy = "own house"
                 self.strategy_start = self.model.schedule.time
+
+        if self.money > 15 and self.strategy == "rent":
+            self.bank.deposit(self, self.money - 15)
+
+        elif self.money > 40 and (self.strategy[:8] == "mortgage" or self.strategy == "own house"):
+            self.bank.deposit(self, self.money - 40)
 
         if self.money < 15:
             needed_money = 15 - self.money

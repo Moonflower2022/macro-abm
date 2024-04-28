@@ -10,6 +10,7 @@ chart = ChartModule(
         {"Label": "Firm Money", "Color": "#f14b5a"},
         {"Label": "Government Money", "Color": "#1f77b4"},
         {"Label": "Total Household Money", "Color": "#ff7f0e"},
+        {"Label": "Total Household Deposits", "Color": "000000"}
     ]
 )
 
