@@ -1,4 +1,3 @@
-import random
 import mesa
 
 # 1 tick is a week
