@@ -12,9 +12,9 @@ class Bank(mesa.Agent):
 
     compound_interval = 4
 
-    def __init__(self, unique_id, model, annual_interest):
+    def __init__(self, unique_id, model, monthly_interest):
         super().__init__(unique_id, model)
-        self.annual_interest = annual_interest
+        self.monthly_interest = monthly_interest
 
     def deposit(self, household, amount):
         if household.unique_id in self.deposits:
@@ -52,13 +52,13 @@ class Bank(mesa.Agent):
         for info in self.loan_info:
             info["weeks"] += 1
             if info["weeks"] % self.compound_interval == 0:
-                info["amount"] *= 1 + self.annual_interest / 12
+                info["amount"] *= 1 + self.monthly_interest
             if info["weeks"] > self.loan_ticks:
                 self.demand_loan(info)
         for info in self.deposits.values():
             info["weeks"] += 1
             if info["weeks"] % self.compound_interval == 0:
-                compound_addition = info["amount"] * self.annual_interest / 12
+                compound_addition = info["amount"] * self.monthly_interest
                 if self.money > compound_addition:
                     self.money -= compound_addition
                     info["amount"] += compound_addition
@@ -70,11 +70,11 @@ class Household(mesa.Agent):
     change_interval = 4
     compound_interval = 4    
 
-    def __init__(self, unique_id, model, bank, income, annual_interest):
+    def __init__(self, unique_id, model, bank, income, monthly_interest):
         super().__init__(unique_id, model)
         self.income = income
         self.bank = bank
-        self.annual_interest = annual_interest
+        self.monthly_interest = monthly_interest
 
     def step(self):
         if self.model.schedule.time % self.change_interval == 0:
