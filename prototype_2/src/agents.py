@@ -56,7 +56,7 @@ class Bank(mesa.Agent):
         for info in self.loan_info:
             info["weeks"] += 1
             if info["weeks"] % self.compound_interval == 0:
-                info["amount"] *= 1 + self.monthly_interest_rate / 12
+                info["amount"] *= 1 + self.monthly_interest_rate
             if info["weeks"] > self.loan_ticks:
                 self.demand_loan(info)
 
