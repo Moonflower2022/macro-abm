@@ -144,8 +144,39 @@ class Government(mesa.Agent):
 
 class Firm(mesa.Agent):
 
-
-
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
+        self.money = 0
+
+    def pay_wages(self):
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, Household):
+                if hasattr(agent, 'income'):  
+                    if agent.income == 'high':
+                        wage = 40
+                    elif agent.income == 'mid':
+                        wage = 35
+                    elif agent.income == 'low':
+                        wage = 30
+                    else:
+                        continue
+                        # just in case for debugging later
+                    agent.money += wage
+                    self.cash -= wage
+
+    def export_goods(self):
+        self.money += 150
+
+    def collect(self):
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, Household):
+                agent.money -= 5
+                self.cash += 5
+
+    def step(self):
+        if self.model.schedule.time % 4 == 0:
+            self.pay_wages()
+            self.export_goods()
+            self.collect_fees()
+        
 
