@@ -3,18 +3,22 @@ import mesa
 
 # 1 tick is a week
 
-def get(model, agent_class):
+def get_all(model, agent_class):
     agents = []
     for agent in model.schedule.agents:
         if isinstance(agent, agent_class):
             agents.append(agent)
 
-    if len(agents) > 1:
-        print(f"Warning: there are multiple {agent_class.__name__} in this model")
+    if len(agents) > 0:
         return agents
-    elif len(agents) == 1:
-        return agents[0]
     # len(agents) == 0
+    raise Exception(f"uh oh none of agent {agent_class.__name__} found in model")
+
+
+def get(model, agent_class):
+    for agent in model.schedule.agents:
+        if isinstance(agent, agent_class):
+            return agent
     raise Exception(f"uh oh none of agent {agent_class.__name__} found in model")
 
 def time_due(model, start, interval):
@@ -176,11 +180,9 @@ class Firm(mesa.Agent):
 
     def step(self):
         if self.model.schedule.time == 0:
-            self.households = get(self.model, Household)
+            self.households = get_all(self.model, Household)
 
         if time_due(self.model, 0, self.goods_interval):
             self.pay_wages()
             self.export_goods()
             self.sell_goods()
-        
-
