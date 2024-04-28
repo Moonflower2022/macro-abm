@@ -25,7 +25,7 @@ class Bank(mesa.Agent):
     loan_ticks = 8
     loan_info = []
 
-    annual_interest_rate = 0.005
+    monthly_interest_rate = 0.005
     compound_interval = 4
 
     def __init__(self, unique_id, model):
@@ -58,7 +58,7 @@ class Bank(mesa.Agent):
         for info in self.loan_info:
             info["weeks"] += 1
             if info["weeks"] % self.compound_interval == 0:
-                info["amount"] *= 1 + self.annual_interest_rate / 12
+                info["amount"] *= 1 + self.monthly_interest_rate / 12
             if info["weeks"] > self.loan_ticks:
                 self.demand_loan(info)
 
@@ -79,7 +79,7 @@ class Household(mesa.Agent):
     utilities_cost = rent / 5
     goods_cost = 5
     mortgage_cost = 30
-    annual_morgage_rate = 0.035
+    monthly_morgage_rate = 0.035
 
     def __init__(self, unique_id, model, income):
         super().__init__(unique_id, model)
@@ -97,7 +97,7 @@ class Household(mesa.Agent):
             self.government += self.utilities_cost
 
         if self.strategy[:8] == "mortgage" and time_due(self.counter, self.strategy_start, self.mortgage_interval):
-            mortgage_after_interest = self.mortgage_cost * (1 + self.annual_morgage_rate) ** ((self.counter - self.strategy_start) / 4)
+            mortgage_after_interest = self.mortgage_cost * (1 + self.monthly_morgage_rate) ** ((self.counter - self.strategy_start) / 4)
             self.money -= mortgage_after_interest
             self.bank.money += mortgage_after_interest - self.utilities_cost
             self.government.money += self.utilities_cost
