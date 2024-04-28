@@ -1,32 +1,29 @@
 import mesa
+from mesa.visualization.modules import ChartModule
 from .model import MacroModel
 
-LOANS_COLOR = "#2ca02c"
-TOTAL_CASH_COLOR = "#d62728"
-_COLOR = "#f14b5a"
-CASH_COLORS = [
-    "#2596be",
-    "#e28743",
-    "#21130d"
-]
+CASH_COLORS = ["#2596be", "#e28743", "#21130d"]
 
-
-chart = mesa.visualization.ChartModule(
+chart = ChartModule(
     [
-        {"Label": "Bank Money", "Color": LOANS_COLOR},
-        {"Label": "Total Household Money", "Color": TOTAL_CASH_COLOR}
+        {"Label": "Bank Money", "Color": "#2ca02c"},
+        {"Label": "Firm Money", "Color": "#f14b5a"},
+        {"Label": "Government Money", "Color": "#d62728"},
+        {"Label": "Total Household Money", "Color": "#d62728"},
     ]
 )
 
-chart2 = mesa.visualization.ChartModule(
+chart2 = ChartModule(
     [
-        {"Label": "Money 1", "Color": CASH_COLORS[0]},
-        {"Label": "Money 2", "Color": CASH_COLORS[1]},
-        {"Label": "Money 3", "Color": CASH_COLORS[2]},
+        {"Label": "Household 1 Money", "Color": CASH_COLORS[0]},
+        {"Label": "Household 2 Money", "Color": CASH_COLORS[1]},
+        {"Label": "Household 3 Money", "Color": CASH_COLORS[2]},
     ]
 )
 
 total_steps = 100
 
-server = mesa.visualization.ModularServer(MacroModel, [chart, chart2], "Macro Model", {"total_steps": total_steps})
+server = mesa.visualization.ModularServer(
+    MacroModel, [chart, chart2], "Macro Model", {"total_steps": total_steps}
+)
 server.port = 8520

@@ -3,7 +3,7 @@ import mesa
 
 # 1 tick is a week
 
-def find(model, agent_class):
+def get(model, agent_class):
     agents = []
     for agent in model.schedule.agents:
         if isinstance(agent, agent_class):
@@ -17,8 +17,8 @@ def find(model, agent_class):
     # len(agents) == 0
     raise Exception(f"uh oh none of agent {agent_class.__name__} found in model")
 
-def time_due(counter, start, interval):
-    return (counter - start) % interval == 0
+def time_due(model, start, interval):
+    return (model.schedule.time - start) % interval == 0
 
 class Bank(mesa.Agent):
     money = 500
@@ -30,8 +30,6 @@ class Bank(mesa.Agent):
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
-
-        self.government = find(model, Government)
 
     def loan(self, household, amount):
         household.money += amount
@@ -72,12 +70,10 @@ class Household(mesa.Agent):
 
     strategy = "rent"
     strategy_start = 0
-    counter = 0
 
     house_cost = 360
     rent = 15
     utilities_cost = rent / 5
-    goods_cost = 5
     mortgage_cost = 30
     monthly_morgage_rate = 0.035
 
@@ -86,30 +82,56 @@ class Household(mesa.Agent):
         self.income = income
 
         self.model = model
-        self.bank = find(model, Bank)
-        self.government = find(model, Government)
+        self.bank = get(model, Bank)
+        self.government = get(model, Government)
+
+    def pay_rent(self):
+        self.money -= self.rent
+        self.bank.money += self.rent - self.utilities_cost
+        # bank should pay 20% of the rent to the government
+        self.government.money += self.utilities_cost
+
+    def pay_utilities(self):
+        self.money -= self.utilities_cost
+        self.government.money += self.utilities_cost
+        
+    def pay_mortgage(self):
+        mortgage_after_interest = self.mortgage_cost * (1 + self.monthly_morgage_rate) ** ((self.model.schedule.time - self.strategy_start) / 4)
+        self.money -= mortgage_after_interest
+        self.bank.money += mortgage_after_interest - self.utilities_cost
+        self.government.money += self.utilities_cost
+
+    def buy_house(self):
+        if self.money >= 360:
+            self.strategy = "own house"
+            self.money -= 360
+        elif self.money >= 270:
+            self.strategy = "mortgage A"
+            self.money -= 270
+        elif self.money >= 180:
+            self.strategy = "mortgage B"
+            self.money -= 180
+        elif self.money >= 90:
+            self.strategy = "mortgage C"
+            self.money -= 90
+        else:
+            raise Exception("household agent does not have enough money to buy house :(")
+        self.strategy_start = self.model.schedule.time
 
     def step(self):
-        if self.strategy == "rent" and time_due(self.counter, self.strategy_start, self.rent_interval):
-            self.money -= self.rent
-            self.bank.money += self.rent - self.utilities_cost
-            # bank should pay 20% of the rent to the government
-            self.government += self.utilities_cost
+        if self.strategy == "rent" and time_due(self.model, self.strategy_start, self.rent_interval):
+            self.pay_rent()
 
-        if self.strategy[:8] == "mortgage" and time_due(self.counter, self.strategy_start, self.mortgage_interval):
-            mortgage_after_interest = self.mortgage_cost * (1 + self.monthly_morgage_rate) ** ((self.counter - self.strategy_start) / 4)
-            self.money -= mortgage_after_interest
-            self.bank.money += mortgage_after_interest - self.utilities_cost
-            self.government.money += self.utilities_cost
+        if self.strategy[:8] == "mortgage" and time_due(self.model, self.strategy_start, self.mortgage_interval):
+            self.pay_mortgage()
 
-        if self.strategy == "own house" and time_due(self.counter, self.strategy_start, self.utilities_interval):
-            self.money -= self.utilities_cost
-            self.government.money += self.utilities_cost
+        if self.strategy == "own house" and time_due(self.model, self.strategy_start, self.utilities_interval):
+            self.pay_utilities()
 
         if self.strategy[:8] == "mortgage":
-            if (self.counter - self.strategy_start) / 4 >= {"A": 3, "B": 6, "C": 9}[self.strategy[9]]:
+            if (self.model.schedule.time - self.strategy_start) / 4 >= {"A": 3, "B": 6, "C": 9}[self.strategy[9]]:
                 self.strategy = "own house"
-                self.strategy_start = self.counter
+                self.strategy_start = self.model.schedule.time
 
         if self.money < 15:
             needed_money = 15 - self.money
@@ -117,24 +139,9 @@ class Household(mesa.Agent):
             if self.bank.money >= needed_money:
                 self.bank.loan(self, needed_money)
 
-        if self.counter == 14 * 4: # 14 months
-            if self.money >= 360:
-                self.strategy = "own house"
-                self.money -= 360
-            elif self.money >= 270:
-                self.strategy = "mortgage A"
-                self.money -= 270
-            elif self.money >= 180:
-                self.strategy = "mortgage B"
-                self.money -= 180
-            elif self.money >= 90:
-                self.strategy = "mortgage C"
-                self.money -= 90
+        if self.model.schedule.time == 14 * 4: # 14 months
+            self.buy_house()
             
-            self.strategy_start = self.counter
-
-        self.counter += 1
-
 class Government(mesa.Agent):
     money = 500
 
@@ -143,40 +150,37 @@ class Government(mesa.Agent):
 
 
 class Firm(mesa.Agent):
+    money = 150
+
+    goods_cost = 5
+
+    goods_interval = 4
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
-        self.money = 0
 
     def pay_wages(self):
-        for agent in self.model.schedule.agents:
-            if isinstance(agent, Household):
-                if hasattr(agent, 'income'):  
-                    if agent.income == 'high':
-                        wage = 40
-                    elif agent.income == 'mid':
-                        wage = 35
-                    elif agent.income == 'low':
-                        wage = 30
-                    else:
-                        continue
-                        # just in case for debugging later
-                    agent.money += wage
-                    self.cash -= wage
+        for household in self.households:
+            household.money += household.income
+            if self.money < household.income:
+                raise Exception("firm just defaulted??!?!?!?!?!")
+            self.money -= household.income
 
     def export_goods(self):
         self.money += 150
 
-    def collect(self):
-        for agent in self.model.schedule.agents:
-            if isinstance(agent, Household):
-                agent.money -= 5
-                self.cash += 5
+    def sell_goods(self):
+        for household in self.households:
+            household.money -= self.goods_cost
+            self.money += self.goods_cost
 
     def step(self):
-        if self.model.schedule.time % 4 == 0:
+        if self.model.schedule.time == 0:
+            self.households = get(self.model, Household)
+
+        if time_due(self.model, 0, self.goods_interval):
             self.pay_wages()
             self.export_goods()
-            self.collect_fees()
+            self.sell_goods()
         
 

@@ -67,7 +67,6 @@ class Bank(mesa.Agent):
 class Household(mesa.Agent):
     cash = 100
     deposit = 0
-    counter = 0
     change_interval = 4
     compound_interval = 4    
 
@@ -78,7 +77,7 @@ class Household(mesa.Agent):
         self.annual_interest = annual_interest
 
     def step(self):
-        if self.counter % self.change_interval == 0:
+        if self.model.schedule.time % self.change_interval == 0:
             self.cash += self.income
             self.cash -= random.randint(10, 30)
 
@@ -95,5 +94,3 @@ class Household(mesa.Agent):
 
         if self.cash > 65:
             self.bank.deposit(self, self.cash - 65)
-
-        self.counter += 1
