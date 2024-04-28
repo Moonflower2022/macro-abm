@@ -154,7 +154,7 @@ class Firm(mesa.Agent):
 
     goods_cost = 5
 
-    goods_interval = 4
+    goods_interval = 2
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)

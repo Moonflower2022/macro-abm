@@ -8,8 +8,8 @@ chart = ChartModule(
     [
         {"Label": "Bank Money", "Color": "#2ca02c"},
         {"Label": "Firm Money", "Color": "#f14b5a"},
-        {"Label": "Government Money", "Color": "#d62728"},
-        {"Label": "Total Household Money", "Color": "#d62728"},
+        {"Label": "Government Money", "Color": "#1f77b4"},
+        {"Label": "Total Household Money", "Color": "#ff7f0e"},
     ]
 )
 
