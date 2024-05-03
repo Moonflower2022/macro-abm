@@ -105,8 +105,10 @@ class Household(mesa.Agent):
         self.education = education
 
         self.model = model
-        self.bank = get(model, Bank)
-        self.government = get(model, Government)
+        
+    def get_references(self):
+        self.bank = get(self.model, Bank)
+        self.government = get(self.model, Government)
 
     def consume(self):
         lower_bound = self.weekly_goods_consumption - self.weekly_goods_consumption_range
@@ -148,6 +150,8 @@ class Household(mesa.Agent):
         self.strategy_start = self.model.schedule.time
 
     def step(self):
+        if self.model.schedule.time == 0:
+            self.get_references()
         self.consume()
         self.goods += 3.5
 
@@ -189,34 +193,66 @@ class Government(mesa.Agent):
 
 class Firm(mesa.Agent):
     money = 2000
+    goods = 0
+    employees = [0, 0, 0]
 
     goods_cost = 5
 
-    goods_interval = 2
+    goods_interval = 1
 
-    def __init__(self, unique_id, model):
+    def __init__(self, unique_id, model, required_employees):
         super().__init__(unique_id, model)
+        self.required_employees = required_employees
 
-    def pay_wages(self):
+    def fraction_production(self):
+        number_required = len(self.required_employees) - self.required_employees.count(0)
+        fraction = 0
+
+        for i, requirement in enumerate(self.required_employees):
+            if not requirement == 0:
+                fraction += self.employees[i] / requirement
+
+        return fraction / number_required
+
+    def get_references(self):
+        self.households = get_all(self.model, Household)
+
+    def pay_wages(self): # old
         for household in self.households:
             household.money += household.income
             if self.money < household.income:
                 raise Exception("firm just defaulted??!?!?!?!?!")
             self.money -= household.income
 
-    def export_goods(self):
+    def export_goods(self): # old
         self.money += 2000
 
-    def sell_goods(self):
+    def sell_goods(self): # old
         for household in self.households:
             household.money -= self.goods_cost
             self.money += self.goods_cost
 
-    def step(self):
+    def step(self): # old
         if self.model.schedule.time == 0:
-            self.households = get_all(self.model, Household)
+            self.get_references()
 
         if time_due(self.model, 0, self.goods_interval):
             self.pay_wages()
             self.export_goods()
             self.sell_goods()
+
+class LargeFirm(Firm):
+
+    def __init__(self, unique_id, model, required_employees):
+        super().__init__(self, unique_id, model, required_employees)
+
+class MediumFirm(Firm):
+
+    def __init__(self, unique_id, model, required_employees):
+        super().__init__(self, unique_id, model, required_employees)
+
+class SmallFirm(Firm):
+
+    def __init__(self, unique_id, model, required_employees):
+        super().__init__(self, unique_id, model, required_employees)
+

@@ -23,8 +23,12 @@ def get_household_deposits(model):
 class MacroModel(mesa.Model):
     household_num = 40
 
-    educations = [3] * 4 + [2] * 11 + [1] * 25
+    educations = [2] * 4 + [1] * 11 + [0] * 25 # education 2 is the highest, 1 is mid, 0 is bad
     incomes = [40] * 4 + [35] * 11 + [30] * 25
+
+    large_required_employees = [8, 4, 2]
+    medium_required_employees = [4, 2, 1]
+    small_required_employees = [3, 1, 0]
 
     def __init__(self, total_steps=100):
         super().__init__()
@@ -48,8 +52,8 @@ class MacroModel(mesa.Model):
         unique_educations = list(set(self.educations))
 
         for level in unique_educations:
-            data_collectors[f"Education {level} Avg Money"] = lambda model, level=level: avg([agent.money for agent in model.schedule.agents if isinstance(agent, Household) and agent.education == level])
-            data_collectors[f"Education {level} Avg Goods"] = lambda model, level=level: avg([agent.goods for agent in model.schedule.agents if isinstance(agent, Household) and agent.education == level])
+            data_collectors[f"Education {level + 1} Avg Money"] = lambda model, level=level: avg([agent.money for agent in model.schedule.agents if isinstance(agent, Household) and agent.education == level])
+            data_collectors[f"Education {level + 1} Avg Goods"] = lambda model, level=level: avg([agent.goods for agent in model.schedule.agents if isinstance(agent, Household) and agent.education == level])
 
         data_collectors.update({
             "Bank Money": get_bank_money, 
