@@ -4,11 +4,10 @@ import random
 
 # 1 tick is a week
 
+
 class Bank(mesa.Agent):
-    money = 500
     loan_ticks = 8
-    loan_info = []
-    deposits = {}
+    
 
     monthly_interest_rate = 0.005
     compound_interval = 4
@@ -16,14 +15,15 @@ class Bank(mesa.Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
 
+        self.money = 500
+
+        self.loan_info = []
+        self.deposits = {}
+
     def loan(self, household, amount):
         household.money += amount
         self.money -= amount
-        self.loan_info.append({
-            "household": household,
-            "weeks": 0,
-            "amount": amount
-        })
+        self.loan_info.append({"household": household, "weeks": 0, "amount": amount})
 
     def demand_loan(self, info):
         if info["amount"] <= self.deposits[info["household"].unique_id]["amount"]:
@@ -33,10 +33,12 @@ class Bank(mesa.Agent):
             self.money += info["amount"]
             info["household"].money -= info["amount"]
         else:
-            print(f"household {info['household'].unique_id} defaulted on loan of {info['amount']}, could only pay back {info['household'].money}")
+            print(
+                f"household {info['household'].unique_id} defaulted on loan of {info['amount']}, could only pay back {info['household'].money}"
+            )
             self.money += info["household"].money
             info["household"].money = 0
-            
+
         self.loan_info.remove(info)
 
     def deposit(self, household, amount):
@@ -46,7 +48,7 @@ class Bank(mesa.Agent):
         else:
             self.deposits[household.unique_id] = {
                 "amount": amount,
-                "start": household.model.schedule.time
+                "start": household.model.schedule.time,
             }
 
     def withdraw(self, household, amount):
@@ -59,9 +61,10 @@ class Bank(mesa.Agent):
                 household.money += amount
                 self.deposits[household.unique_id]["amount"] -= amount
                 return
-            raise Exception("household is withdrawing more money than it can")                
-        raise Exception("household is trying to withdraw from bank when it doesnt have any deposit money in its name")
-        
+            raise Exception("household is withdrawing more money than it can")
+        raise Exception(
+            "household is trying to withdraw from bank when it doesnt have any deposit money in its name"
+        )
 
     def step(self):
         for info in self.loan_info:
@@ -78,19 +81,15 @@ class Bank(mesa.Agent):
                     info["amount"] += compound_addition
                 else:
                     raise Exception("bank defaulted :(")
-                
+
 
 class Household(mesa.Agent):
-    money = 20
-    goods = 3
-    
     rent_interval = 4
     mortgage_interval = 4
     utilities_interval = 4
+    goods_interval = 1
 
-    strategy = "rent"
-    strategy_start = 0
-
+    goods_cost = 5
     house_cost = 360
     rent = 15
     utilities_cost = rent / 5
@@ -99,21 +98,42 @@ class Household(mesa.Agent):
     weekly_goods_consumption_range = 0.25
     monthly_morgage_rate = 0.035
 
-    def __init__(self, unique_id, model, income, education):
+    def __init__(self, unique_id, model, education):
         super().__init__(unique_id, model)
-        self.income = income # maybe delete
         self.education = education
 
         self.model = model
-        
+
+        self.money = 20
+        self.goods = 0
+
+        self.strategy = "rent"
+        self.strategy_start = 0
+        self.employed = False
+        self.employer = None
+
     def get_references(self):
         self.bank = get(self.model, Bank)
         self.government = get(self.model, Government)
+        self.stores = get_all(self.model, SmallFirm)
 
-    def consume(self):
-        lower_bound = self.weekly_goods_consumption - self.weekly_goods_consumption_range
-        upper_bound = self.weekly_goods_consumption + self.weekly_goods_consumption_range
-        self.goods -= random.uniform(lower_bound, upper_bound)
+    def buy_goods(self):
+        lower_bound = (
+            self.weekly_goods_consumption - self.weekly_goods_consumption_range
+        )
+        upper_bound = (
+            self.weekly_goods_consumption + self.weekly_goods_consumption_range
+        )
+        demand = max(random.uniform(lower_bound, upper_bound) - self.goods, 0)
+
+        for store in self.stores:
+            if store.goods >= demand:
+                store.goods -= demand
+                if self.money < demand * self.goods_cost:
+                    raise Exception(f"household {self} cant buy food :'(")
+                self.money -= demand * self.goods_cost
+                break
+        print(f"household {self} couldnt find a store to buy food from")
 
     def pay_rent(self):
         self.money -= self.rent
@@ -124,9 +144,11 @@ class Household(mesa.Agent):
     def pay_utilities(self):
         self.money -= self.utilities_cost
         self.government.money += self.utilities_cost
-        
+
     def pay_mortgage(self):
-        mortgage_after_interest = self.mortgage_cost * (1 + self.monthly_morgage_rate) ** ((self.model.schedule.time - self.strategy_start) / 4)
+        mortgage_after_interest = self.mortgage_cost * (
+            1 + self.monthly_morgage_rate
+        ) ** ((self.model.schedule.time - self.strategy_start) / 4)
         self.money -= mortgage_after_interest
         self.bank.money += mortgage_after_interest - self.utilities_cost
         self.government.money += self.utilities_cost
@@ -146,33 +168,48 @@ class Household(mesa.Agent):
             self.strategy = "mortgage C"
             self.money -= 90
         else:
-            raise Exception("household agent does not have enough money to buy house :(")
+            raise Exception(
+                "household agent does not have enough money to buy house :("
+            )
         self.strategy_start = self.model.schedule.time
 
     def step(self):
         if self.model.schedule.time == 0:
             self.get_references()
-        self.consume()
-        self.goods += 3.5
 
-        if self.strategy == "rent" and time_due(self.model, self.strategy_start, self.rent_interval):
+        if self.strategy == "rent" and time_due(
+            self.model, self.strategy_start, self.rent_interval
+        ):
             self.pay_rent()
 
-        if self.strategy[:8] == "mortgage" and time_due(self.model, self.strategy_start, self.mortgage_interval):
+        if self.strategy[:8] == "mortgage" and time_due(
+            self.model, self.strategy_start, self.mortgage_interval
+        ):
             self.pay_mortgage()
 
-        if self.strategy == "own house" and time_due(self.model, self.strategy_start, self.utilities_interval):
+        if self.strategy == "own house" and time_due(
+            self.model, self.strategy_start, self.utilities_interval
+        ):
             self.pay_utilities()
 
         if self.strategy[:8] == "mortgage":
-            if (self.model.schedule.time - self.strategy_start) / 4 >= {"A": 3, "B": 6, "C": 9}[self.strategy[9]]:
+            if (self.model.schedule.time - self.strategy_start) / 4 >= {
+                "A": 3,
+                "B": 6,
+                "C": 9,
+            }[self.strategy[9]]:
                 self.strategy = "own house"
                 self.strategy_start = self.model.schedule.time
+
+        if time_due(self.model, 0, self.goods_interval):
+            self.buy_goods()
 
         if self.money > 15 and self.strategy == "rent":
             self.bank.deposit(self, self.money - 15)
 
-        elif self.money > 40 and (self.strategy[:8] == "mortgage" or self.strategy == "own house"):
+        elif self.money > 40 and (
+            self.strategy[:8] == "mortgage" or self.strategy == "own house"
+        ):
             self.bank.deposit(self, self.money - 40)
 
         if self.money < 15:
@@ -181,9 +218,10 @@ class Household(mesa.Agent):
             if self.bank.money >= needed_money:
                 self.bank.loan(self, needed_money)
 
-        if self.model.schedule.time == 14 * 4: # 14 months
+        if self.model.schedule.time == 14 * 4:  # 14 months
             self.buy_house()
-            
+
+
 class Government(mesa.Agent):
     money = 500
 
@@ -192,67 +230,118 @@ class Government(mesa.Agent):
 
 
 class Firm(mesa.Agent):
-    money = 250
-    goods = 0
-    employees = [0, 0, 0]
-
     goods_cost = 5
+    minimum_wage = 5
 
     goods_interval = 1
 
-    def __init__(self, unique_id, model, required_employees):
+    def __init__(self, unique_id, model, required_employees, production_quantity):
         super().__init__(unique_id, model)
         self.required_employees = required_employees
+        self.production_quantity = production_quantity
+
+        self.employee_counts = [0, 0, 0]
+        self.employees = [[], [], []]
+
+        self.money = 250
+        self.goods = 0
+
+    def hire_worker(self, education):
+        if self.employees[education] == self.required_employees[education]:
+            print(
+                f"Warning: employees of education level {education} is already at max for firm {self}"
+            )
+        for worker in get_all(self.model, Household):
+            if worker.education == education and worker.employed == False:
+                worker.employed = True
+                worker.employer = self
+                self.employee_counts[education] += 1
+                self.employees[education].append(worker)
+                break
+
+    def init_workers(self):
+        print(self.required_employees)
+        for education, count in enumerate(self.required_employees):
+            for _ in range(count):
+                self.hire_worker(education)
 
     def fraction_production(self):
-        number_required = len(self.required_employees) - self.required_employees.count(0)
-        fraction = 0
-
-        for i, requirement in enumerate(self.required_employees):
-            if not requirement == 0:
-                fraction += self.employees[i] / requirement
+        number_required = len(self.required_employees) - self.required_employees.count(
+            0
+        )
+        fraction = sum(
+            self.employee_counts[education] / requirement
+            for education, requirement in enumerate(self.required_employees)
+            if not requirement == 0
+        )
 
         return fraction / number_required
 
+    def worker_fraction_production(self, education):
+        if self.employee_counts[education] == 0:
+            raise Exception(
+                "warning: attempting to find the fraction of product of a worker that does not exist"
+            )
+        return 1 / (3 * self.required_employees[education])
+
     def get_references(self):
-        self.households = get_all(self.model, Household)
+        pass
 
-    def pay_wages(self): # old
-        for household in self.households:
-            household.money += household.income
-            if self.money < household.income:
-                raise Exception("firm just defaulted??!?!?!?!?!")
-            self.money -= household.income
+    def pay_wages(self, revenue):
+        for education_class in self.employees:
+            for worker in education_class:
+                wage = (
+                    revenue * self.worker_fraction_production(worker.education)
+                    # + self.minimum_wage
+                )
+                if self.money < wage:
+                    raise Exception(f"Firm defaulted. ID: {self.unique_id}, {self}")
+                worker.money += wage
+                self.money -= wage
 
-    def export_goods(self): # old
-        self.money += 2000
+    def acquire_goods(self):
+        self.goods += self.production_quantity * self.fraction_production()
 
-    def sell_goods(self): # old
-        for household in self.households:
-            household.money -= self.goods_cost
-            self.money += self.goods_cost
+    def export_goods(self):
+        revenue = 135 * self.fraction_production() * self.goods_cost
+        self.money += revenue
+        return revenue
 
-    def step(self): # old
+    def step(self):
         if self.model.schedule.time == 0:
             self.get_references()
+            self.init_workers()
 
         if time_due(self.model, 0, self.goods_interval):
-            self.pay_wages()
-            self.export_goods()
-            self.sell_goods()
+            self.acquire_goods()
+            revenue = self.export_goods()
+            self.pay_wages(revenue)
+
 
 class LargeFirm(Firm):
+    def __init__(self, unique_id, model, required_employees, production_quantity):
+        super().__init__(unique_id, model, required_employees, production_quantity)
 
-    def __init__(self, unique_id, model, required_employees):
-        super().__init__(self, unique_id, model, required_employees)
+    def get_references(self):
+        super().get_references()
+        self.firms = get_all(self.model, MediumFirm)
+
+    def step(self):
+        super().step()
+
 
 class MediumFirm(Firm):
+    def __init__(self, unique_id, model, required_employees, production_quantity):
+        super().__init__(unique_id, model, required_employees, production_quantity)
 
-    def __init__(self, unique_id, model, required_employees):
-        super().__init__(self, unique_id, model, required_employees)
+    def get_references(self):
+        super().get_references()
+        self.firms = get_all(self.model, SmallFirm)
+
+    def step(self):
+        super().step()
+
 
 class SmallFirm(Firm):
-
-    def __init__(self, unique_id, model, required_employees):
-        super().__init__(self, unique_id, model, required_employees)
-
+    def __init__(self, unique_id, model, required_employees, production_quantity):
+        super().__init__(unique_id, model, required_employees, production_quantity)

@@ -7,7 +7,9 @@ COLORS = ["#2596be", "#e28743", "#21130d"]
 chart = ChartModule(
     [
         {"Label": "Bank Money", "Color": "#2ca02c"},
-        {"Label": "Firm Money", "Color": "#f14b5a"},
+        {"Label": "Large Firm Money", "Color": "#12fe1e"},
+        {"Label": "Medium Firm Money", "Color": "#f14b5a"},
+        {"Label": "Large Firm Money", "Color": "#000000"},
         {"Label": "Government Money", "Color": "#1f77b4"},
         {"Label": "Total Household Money", "Color": "#ff7f0e"},
         {"Label": "Total Household Deposits", "Color": "000000"}
