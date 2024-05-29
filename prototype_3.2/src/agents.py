@@ -7,7 +7,6 @@ import random
 
 class Bank(mesa.Agent):
     loan_ticks = 8
-    
 
     monthly_interest_rate = 0.005
     compound_interval = 4
@@ -89,7 +88,6 @@ class Household(mesa.Agent):
     utilities_interval = 4
     goods_interval = 1
 
-    goods_cost = 5
     house_cost = 360
     rent = 15
     utilities_cost = rent / 5
@@ -106,6 +104,7 @@ class Household(mesa.Agent):
 
         self.money = 20
         self.goods = 0
+        self.set_goods_requirement()
 
         self.strategy = "rent"
         self.strategy_start = 0
@@ -117,23 +116,17 @@ class Household(mesa.Agent):
         self.government = get(self.model, Government)
         self.stores = get_all(self.model, SmallFirm)
 
-    def buy_goods(self):
+    def set_goods_requirement(self):
         lower_bound = (
             self.weekly_goods_consumption - self.weekly_goods_consumption_range
         )
         upper_bound = (
             self.weekly_goods_consumption + self.weekly_goods_consumption_range
         )
-        demand = max(random.uniform(lower_bound, upper_bound) - self.goods, 0)
 
-        for store in self.stores:
-            if store.goods >= demand:
-                store.goods -= demand
-                if self.money < demand * self.goods_cost:
-                    raise Exception(f"household {self} cant buy food :'(")
-                self.money -= demand * self.goods_cost
-                break
-        print(f"household {self} couldnt find a store to buy food from")
+        self.goods_requirement = max(
+            random.uniform(lower_bound, upper_bound) - self.goods, 0
+        )
 
     def pay_rent(self):
         self.money -= self.rent
@@ -221,6 +214,8 @@ class Household(mesa.Agent):
         if self.model.schedule.time == 14 * 4:  # 14 months
             self.buy_house()
 
+        self.set_goods_requirement()
+
 
 class Government(mesa.Agent):
     money = 500
@@ -235,15 +230,12 @@ class Firm(mesa.Agent):
 
     goods_interval = 1
 
-    def __init__(self, unique_id, model, required_employees, production_quantity):
+    def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
-        self.required_employees = required_employees
-        self.production_quantity = production_quantity
-
         self.employee_counts = [0, 0, 0]
         self.employees = [[], [], []]
 
-        self.money = 250
+        self.money = 1000
         self.goods = 0
 
     def hire_worker(self, education):
@@ -260,7 +252,6 @@ class Firm(mesa.Agent):
                 break
 
     def init_workers(self):
-        print(self.required_employees)
         for education, count in enumerate(self.required_employees):
             for _ in range(count):
                 self.hire_worker(education)
@@ -291,7 +282,8 @@ class Firm(mesa.Agent):
         for education_class in self.employees:
             for worker in education_class:
                 wage = (
-                    revenue * self.worker_fraction_production(worker.education)
+                    revenue
+                    * self.worker_fraction_production(worker.education)
                     # + self.minimum_wage
                 )
                 if self.money < wage:
@@ -299,13 +291,27 @@ class Firm(mesa.Agent):
                 worker.money += wage
                 self.money -= wage
 
-    def acquire_goods(self):
-        self.goods += self.production_quantity * self.fraction_production()
+    def get_goods_cost(self):
+        if isinstance(self, LargeFirm):
+            return self.goods_cost
+        return self.goods_cost + (self.value_increase * self.fraction_production())
 
-    def export_goods(self):
-        revenue = 135 * self.fraction_production() * self.goods_cost
-        self.money += revenue
-        return revenue
+    def sell_goods(self):
+        total_revenue = 0
+
+        for customer in self.customers:
+            price = self.get_goods_cost() * customer.goods_requirement
+
+            if customer.money < price:
+                raise Exception(f"customer {customer} went bankrupt")
+            customer.money -= price
+            self.money += price
+            customer.goods += customer.goods_requirement
+            self.goods -= customer.goods_requirement
+
+            total_revenue += price
+
+        return total_revenue
 
     def step(self):
         if self.model.schedule.time == 0:
@@ -313,35 +319,55 @@ class Firm(mesa.Agent):
             self.init_workers()
 
         if time_due(self.model, 0, self.goods_interval):
-            self.acquire_goods()
-            revenue = self.export_goods()
+            revenue = self.sell_goods()
             self.pay_wages(revenue)
 
 
 class LargeFirm(Firm):
-    def __init__(self, unique_id, model, required_employees, production_quantity):
-        super().__init__(unique_id, model, required_employees, production_quantity)
+    required_employees = [8, 4, 2]
+    goods_requirement = 135
+
+    def __init__(self, unique_id, model):
+        super().__init__(unique_id, model)
 
     def get_references(self):
         super().get_references()
-        self.firms = get_all(self.model, MediumFirm)
+        self.customers = get_all(self.model, MediumFirm)
+
+    def acquire_goods(self):
+        self.goods += self.goods_requirement
 
     def step(self):
+        self.acquire_goods()
         super().step()
 
 
 class MediumFirm(Firm):
-    def __init__(self, unique_id, model, required_employees, production_quantity):
-        super().__init__(unique_id, model, required_employees, production_quantity)
+    value_increase = 5  # ratio
+
+    required_employees = [4, 2, 1]
+    goods_requirement = 67.5
+
+    def __init__(self, unique_id, model):
+        super().__init__(unique_id, model)
 
     def get_references(self):
         super().get_references()
-        self.firms = get_all(self.model, SmallFirm)
+        self.customers = get_all(self.model, SmallFirm)
 
     def step(self):
         super().step()
 
 
 class SmallFirm(Firm):
-    def __init__(self, unique_id, model, required_employees, production_quantity):
-        super().__init__(unique_id, model, required_employees, production_quantity)
+    value_increase = 2.6785714285
+
+    required_employees = [3, 1, 0]
+    goods_requirement = 45
+
+    def __init__(self, unique_id, model):
+        super().__init__(unique_id, model)
+
+    def get_references(self):
+        super().get_references()
+        self.customers = get_all(self.model, Household)

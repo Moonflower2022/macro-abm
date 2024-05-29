@@ -45,14 +45,6 @@ class MacroModel(mesa.Model):
     educations = [2] * 4 + [1] * 11 + [0] * 25
     # incomes = [40] * 4 + [35] * 11 + [30] * 25
 
-    large_firm_required_employees = [8, 4, 2]
-    medium_firm_required_employees = [4, 2, 1]
-    small_firm_required_employees = [3, 1, 0]
-
-    large_firm_production_quantity = 135
-    medium_firm_production_quantity = large_firm_production_quantity / 2
-    small_firm_production_quantity = large_firm_production_quantity / 3
-
     def __init__(self, total_steps=100):
         super().__init__()
 
@@ -62,39 +54,18 @@ class MacroModel(mesa.Model):
         id_giver = itertools.count(1)
         self.schedule.add(Government(next(id_giver), self))
         self.schedule.add(Bank(next(id_giver), self))
-        self.schedule.add(
-            LargeFirm(
-                next(id_giver),
-                self,
-                self.large_firm_required_employees,
-                self.large_firm_production_quantity,
-            )
-        )
+        self.schedule.add(LargeFirm(next(id_giver), self))
         for _ in range(2):
-            self.schedule.add(
-                MediumFirm(
-                    next(id_giver),
-                    self,
-                    self.medium_firm_required_employees,
-                    self.medium_firm_production_quantity,
-                )
-            )
+            self.schedule.add(MediumFirm(next(id_giver), self))
         for _ in range(3):
-            self.schedule.add(
-                SmallFirm(
-                    next(id_giver),
-                    self,
-                    self.small_firm_required_employees,
-                    self.small_firm_production_quantity,
-                )
-            )
+            self.schedule.add(SmallFirm(next(id_giver), self))
 
         household_ids = []
         for i in range(self.household_num):
             household_id = next(id_giver)
             household_ids.append(household_id)
             self.schedule.add(
-                Household(household_id, self, self.educations[i]) # self.incomes[i]
+                Household(household_id, self, self.educations[i])  # self.incomes[i]
             )
 
         data_collectors = {}
