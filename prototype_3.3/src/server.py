@@ -9,9 +9,9 @@ chart = ChartModule(
         {"Label": "Bank Money", "Color": "#2ca02c"},
         {"Label": "Large Firm Money", "Color": "#12fe1e"},
         {"Label": "Medium Firm Money", "Color": "#f14b5a"},
-        {"Label": "Large Firm Money", "Color": "#000000"},
+        {"Label": "Small Firm Money", "Color": "#000000"},
         {"Label": "Government Money", "Color": "#1f77b4"},
-        {"Label": "Total Household Money", "Color": "#ff7f0e"},
+        #{"Label": "Total Household Money", "Color": "#ff7f0e"},
         {"Label": "Total Household Deposits", "Color": "000000"}
     ]
 )
@@ -21,9 +21,9 @@ chart2 = ChartModule(
         {"Label": "Education 1 Avg Money", "Color": COLORS[0]},
         {"Label": "Education 2 Avg Money", "Color": COLORS[1]},
         {"Label": "Education 3 Avg Money", "Color": COLORS[2]},
-        {"Label": "Education 1 Avg Goods", "Color": COLORS[0]},
-        {"Label": "Education 2 Avg Goods", "Color": COLORS[1]},
-        {"Label": "Education 3 Avg Goods", "Color": COLORS[2]},
+        #{"Label": "Education 1 Avg Goods", "Color": COLORS[0]},
+        #{"Label": "Education 2 Avg Goods", "Color": COLORS[1]},
+        #{"Label": "Education 3 Avg Goods", "Color": COLORS[2]},
     ]
 )
 

@@ -39,7 +39,7 @@ class MacroModel(mesa.Model):
         id_giver = itertools.count(1)
         self.schedule.add(Government(next(id_giver), self))
         self.schedule.add(Bank(next(id_giver), self))
-        self.schedule.add(Firm(next(id_giver), self))
+        self.schedule.add(SmallFirm(next(id_giver), self))
 
         household_ids = []
         for i in range(self.household_num):

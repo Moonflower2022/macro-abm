@@ -45,6 +45,8 @@ class MacroModel(mesa.Model):
     educations = [2] * 4 + [1] * 11 + [0] * 25
     # incomes = [40] * 4 + [35] * 11 + [30] * 25
 
+    customer_ranges = [[0, 13], [13, 26], [26, 40]]
+
     def __init__(self, total_steps=100):
         super().__init__()
 
@@ -57,8 +59,8 @@ class MacroModel(mesa.Model):
         self.schedule.add(LargeFirm(next(id_giver), self))
         for _ in range(2):
             self.schedule.add(MediumFirm(next(id_giver), self))
-        for _ in range(3):
-            self.schedule.add(SmallFirm(next(id_giver), self))
+        for i in range(3):
+            self.schedule.add(SmallFirm(next(id_giver), self, self.customer_ranges[i]))
 
         household_ids = []
         for i in range(self.household_num):
