@@ -1,13 +1,14 @@
 import mesa
-from .utils import get, get_all, time_due
 import random
+from .utils import get, get_all, time_due
 
 # 1 tick is a week
+
+VALUE_ADDED = 5
 
 
 class Bank(mesa.Agent):
     loan_ticks = 8
-
     monthly_interest_rate = 0.005
     compound_interval = 4
 
@@ -225,9 +226,8 @@ class Government(mesa.Agent):
 
 
 class Firm(mesa.Agent):
-    minimum_wage = 5
-
     goods_interval = 1
+    wages_interval = 4
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
@@ -279,22 +279,17 @@ class Firm(mesa.Agent):
         return 1 / (
             (3 - self.required_employees.count(0)) * self.required_employees[education]
         )
-
-    def get_goods_cost(self):
-        return self.goods_cost * self.fraction_production()
     
-    def get_wages_good_cost(self):
-        return self.value_added * self.fraction_production()
+    def maximum_capacity_monthly_production_quantity(self):
+        return self.goods_requirement * 4
 
-    def pay_wages(self, quantity):
+    def pay_wages(self):
         for education_class in self.employees:
             for worker in education_class:
-
                 wage = (
-                    quantity
-                    * self.get_wages_good_cost()
+                    self.maximum_capacity_monthly_production_quantity()
+                    * VALUE_ADDED
                     * self.employee_fraction_production(worker.education)
-                    # + self.minimum_wage
                 )
                 if self.money < wage:
                     raise Exception(f"Firm defaulted. ID: {self.unique_id}, {self}")
@@ -305,7 +300,11 @@ class Firm(mesa.Agent):
         total_quantity = 0
 
         for customer in self.customers:
-            price = self.get_goods_cost() * customer.goods_requirement
+            price = (
+                self.goods_cost
+                * self.fraction_production()
+                * customer.goods_requirement
+            )
 
             if isinstance(self, SmallFirm):
                 print("price", price)
@@ -329,16 +328,16 @@ class Firm(mesa.Agent):
         if self.model.schedule.time == 0:
             self.get_references()
             self.init_employees()
-
+        
         if time_due(self.model, 0, self.goods_interval):
-            quantity = self.sell_goods()
-            self.pay_wages(quantity)
-
+            self.sell_goods()
+        
+        if time_due(self.model, 4, self.wages_interval):
+            self.pay_wages() 
 
 
 class LargeFirm(Firm):
-    goods_cost = 5
-    value_added = 5
+    goods_cost = VALUE_ADDED
 
     required_employees = [8, 4, 2]
     goods_requirement = 135
@@ -359,8 +358,7 @@ class LargeFirm(Firm):
 
 
 class MediumFirm(Firm):
-    goods_cost = 10
-    value_added = 5
+    goods_cost = LargeFirm.goods_cost + VALUE_ADDED
 
     required_employees = [4, 2, 1]
     goods_requirement = 67.5
@@ -377,8 +375,7 @@ class MediumFirm(Firm):
 
 
 class SmallFirm(Firm):
-    goods_cost = 12.6785714285
-    value_added = 2.6785714285
+    goods_cost = MediumFirm.goods_cost + VALUE_ADDED
 
     required_employees = [3, 1, 0]
     goods_requirement = 22.5
@@ -394,7 +391,7 @@ class SmallFirm(Firm):
         ]
 
     def sell_extra(self):
-        self.money += self.goods * self.get_goods_cost()
+        self.money += self.goods * self.goods_cost * self.fraction_production()
         self.goods = 0
 
     def step(self):

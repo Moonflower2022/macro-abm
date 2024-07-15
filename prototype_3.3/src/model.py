@@ -62,17 +62,14 @@ class MacroModel(mesa.Model):
         for i in range(3):
             self.schedule.add(SmallFirm(next(id_giver), self, self.customer_ranges[i]))
 
-        household_ids = []
         for i in range(self.household_num):
-            household_id = next(id_giver)
-            household_ids.append(household_id)
             self.schedule.add(
-                Household(household_id, self, self.educations[i])  # self.incomes[i]
+                Household(next(id_giver), self, self.educations[i])  # self.incomes[i]
             )
 
-        data_collectors = {}
-
         unique_educations = list(set(self.educations))
+
+        data_collectors = {}
 
         for level in unique_educations:
             data_collectors[f"Education {level + 1} Avg Money"] = (

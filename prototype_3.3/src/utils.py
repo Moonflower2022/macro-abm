@@ -6,7 +6,7 @@ def get_all(model, agent_class):
 
     if len(agents) > 0:
         return agents
-    # len(agents) == 0
+    # elif len(agents) == 0:
     raise Exception(f"uh oh none of agent {agent_class.__name__} found in model")
 
 
@@ -17,6 +17,8 @@ def get(model, agent_class):
     raise Exception(f"uh oh none of agent {agent_class.__name__} found in model")
 
 def time_due(model, start, interval):
+    if model.schedule.time < start:
+        return False
     return (model.schedule.time - start) % interval == 0
 
 def avg(arr):
