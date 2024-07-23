@@ -1,21 +1,22 @@
 import mesa
 import random
 from .utils import get, get_all, time_due
+import yaml
 
-# 1 tick is a week
-
-VALUE_ADDED = 5
+# load configuration file's variables
+with open("src/configuration.yaml", "r") as file:
+    data = yaml.safe_load(file)
 
 
 class Bank(mesa.Agent):
-    loan_ticks = 8
-    monthly_interest_rate = 0.005
-    compound_interval = 4
+    loan_ticks = data["LOAN_TICKS"]
+    monthly_interest_rate = data["MONTHLY_INTEREST_RATE"]
+    compound_interval = data["COMPOUND_INTERVAL"]
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
 
-        self.money = 500
+        self.money = data["BANK_STARTING_MONEY"]
 
         self.loan_info = []
         self.deposits = {}
@@ -84,18 +85,18 @@ class Bank(mesa.Agent):
 
 
 class Household(mesa.Agent):
-    rent_interval = 4
-    mortgage_interval = 4
-    utilities_interval = 4
-    goods_interval = 1
+    rent_interval = data["RENT_INTERVAL"]
+    mortgage_interval = data["MORTGAGE_INTERVAL"]
+    utilities_interval = data["UTILITIES_INTERVAL"]
+    goods_interval = data["GOODS_INTERVAL"]
 
-    house_cost = 360
-    rent = 15
-    utilities_cost = rent / 5
-    mortgage_cost = 30
-    weekly_goods_consumption = 3
-    weekly_goods_consumption_range = 0.25
-    monthly_morgage_rate = 0.035
+    house_cost = data["HOUSE_COST"]
+    rent = data["RENT"]
+    utilities_cost = data["UTILITIES_COST"]
+    mortgage_cost = data["MORTGAGE_COST"]
+    weekly_goods_consumption = data["WEEKLY_GOODS_CONSUMPTION"]
+    weekly_goods_consumption_range = data["WEEKLY_GOODS_CONSUMPTION_RANGE"]
+    monthly_mortgage_rate = data["MONTHLY_MORTGAGE_RATE"]
 
     def __init__(self, unique_id, model, education):
         super().__init__(unique_id, model)
@@ -103,11 +104,11 @@ class Household(mesa.Agent):
 
         self.model = model
 
-        self.money = 1000
-        self.goods = 0
+        self.money = data["HOUSEHOLD_STARTING_MONEY"]
+        self.goods = data["HOUSEHOLD_STARTING_GOODS"]
         self.set_goods_requirement()
 
-        self.strategy = "god"
+        self.strategy = data["HOUSEHOLD_STARTING_STRATEGY"]
         self.strategy_start = 0
         self.employed = False
         self.employer = None
@@ -219,23 +220,20 @@ class Household(mesa.Agent):
 
 
 class Government(mesa.Agent):
-    money = 500
-
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
 
+        self.money = data["GOVERNMENT_STARTING_MONEY"]
+
 
 class Firm(mesa.Agent):
-    goods_interval = 1
-    wages_interval = 4
+    goods_interval = data["GOODS_INTERVAL"]
+    wages_interval = data["WAGES_INTERVAL"]
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
         self.employee_counts = [0, 0, 0]
         self.employees = [[] for _ in range(3)]
-
-        self.money = 1000
-        self.goods = 0
 
     def get_references(self):
         self.households = get_all(self.model, Household)
@@ -279,7 +277,7 @@ class Firm(mesa.Agent):
         return 1 / (
             (3 - self.required_employees.count(0)) * self.required_employees[education]
         )
-    
+
     def maximum_capacity_monthly_production_quantity(self):
         return self.goods_requirement * 4
 
@@ -288,7 +286,7 @@ class Firm(mesa.Agent):
             for worker in education_class:
                 wage = (
                     self.maximum_capacity_monthly_production_quantity()
-                    * VALUE_ADDED
+                    * data["VALUE_ADDED"]
                     * self.employee_fraction_production(worker.education)
                 )
                 if self.money < wage:
@@ -305,9 +303,6 @@ class Firm(mesa.Agent):
                 * self.fraction_production()
                 * customer.goods_requirement
             )
-
-            if isinstance(self, SmallFirm):
-                print("price", price)
 
             if customer.money < price:
                 raise Exception(f"customer {customer} went bankrupt")
@@ -328,22 +323,24 @@ class Firm(mesa.Agent):
         if self.model.schedule.time == 0:
             self.get_references()
             self.init_employees()
-        
+
         if time_due(self.model, 0, self.goods_interval):
             self.sell_goods()
-        
+
         if time_due(self.model, 4, self.wages_interval):
-            self.pay_wages() 
+            self.pay_wages()
 
 
 class LargeFirm(Firm):
-    goods_cost = VALUE_ADDED
-
-    required_employees = [8, 4, 2]
-    goods_requirement = 135
+    goods_cost = data["VALUE_ADDED"]
+    required_employees = data["REQUIRED_EMPLOYEES"]["LARGE"]
+    goods_requirement = data["TOTAL_GOODS_PRODUCED"]
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
+
+        self.money = data["FRIM_STARTING_MONEY"]["LARGE"]
+        self.goods = data["FRIM_STARTING_GOODS"]["LARGE"]
 
     def get_references(self):
         super().get_references()
@@ -358,13 +355,15 @@ class LargeFirm(Firm):
 
 
 class MediumFirm(Firm):
-    goods_cost = LargeFirm.goods_cost + VALUE_ADDED
-
-    required_employees = [4, 2, 1]
-    goods_requirement = 67.5
+    goods_cost = LargeFirm.goods_cost + data["VALUE_ADDED"]
+    required_employees = data["REQUIRED_EMPLOYEES"]["MEDIUM"]
+    goods_requirement = LargeFirm.goods_requirement / data["NUM_FIRMS"]["MEDIUM"]
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
+
+        self.money = data["FRIM_STARTING_MONEY"]["MEDIUM"]
+        self.goods = data["FRIM_STARTING_GOODS"]["MEDIUM"]
 
     def get_references(self):
         super().get_references()
@@ -375,13 +374,14 @@ class MediumFirm(Firm):
 
 
 class SmallFirm(Firm):
-    goods_cost = MediumFirm.goods_cost + VALUE_ADDED
-
-    required_employees = [3, 1, 0]
-    goods_requirement = 22.5
+    goods_cost = MediumFirm.goods_cost + data["VALUE_ADDED"]
+    required_employees = data["REQUIRED_EMPLOYEES"]["SMALL"]
+    goods_requirement = MediumFirm.goods_requirement / data["NUM_FIRMS"]["SMALL"]
 
     def __init__(self, unique_id, model, customer_range):
         super().__init__(unique_id, model)
+        self.money = data["FRIM_STARTING_MONEY"]["SMALL"]
+        self.goods = data["FRIM_STARTING_GOODS"]["SMALL"]
         self.customer_range = customer_range
 
     def get_references(self):
