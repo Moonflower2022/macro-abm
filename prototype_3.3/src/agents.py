@@ -274,8 +274,9 @@ class Firm(mesa.Agent):
                 "warning: attempting to find the fraction of product of a worker that does not exist"
             )
 
-        return 1 / (
-            (3 - self.required_employees.count(0)) * self.required_employees[education]
+        return (
+            data["SHARE_OF_PRODUCTION_CAPACITY"][education]
+            / self.required_employees[education]
         )
 
     def maximum_capacity_monthly_production_quantity(self):
@@ -289,6 +290,8 @@ class Firm(mesa.Agent):
                     * data["VALUE_ADDED"]
                     * self.employee_fraction_production(worker.education)
                 )
+                print("type:", worker)
+                print("wage:", wage)
                 if self.money < wage:
                     raise Exception(f"Firm defaulted. ID: {self.unique_id}, {self}")
                 worker.money += wage
@@ -359,15 +362,18 @@ class MediumFirm(Firm):
     required_employees = data["REQUIRED_EMPLOYEES"]["MEDIUM"]
     goods_requirement = LargeFirm.goods_requirement / data["NUM_FIRMS"]["MEDIUM"]
 
-    def __init__(self, unique_id, model):
+    def __init__(self, unique_id, model, customer_range):
         super().__init__(unique_id, model)
 
         self.money = data["FRIM_STARTING_MONEY"]["MEDIUM"]
         self.goods = data["FRIM_STARTING_GOODS"]["MEDIUM"]
+        self.customer_range = customer_range
 
     def get_references(self):
         super().get_references()
-        self.customers = get_all(self.model, SmallFirm)
+        self.customers = get_all(self.model, SmallFirm)[
+            self.customer_range[0] : self.customer_range[1]
+        ]
 
     def step(self):
         super().step()
@@ -376,7 +382,7 @@ class MediumFirm(Firm):
 class SmallFirm(Firm):
     goods_cost = MediumFirm.goods_cost + data["VALUE_ADDED"]
     required_employees = data["REQUIRED_EMPLOYEES"]["SMALL"]
-    goods_requirement = MediumFirm.goods_requirement / data["NUM_FIRMS"]["SMALL"]
+    goods_requirement = LargeFirm.goods_requirement / data["NUM_FIRMS"]["SMALL"]
 
     def __init__(self, unique_id, model, customer_range):
         super().__init__(unique_id, model)

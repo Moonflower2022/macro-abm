@@ -1,17 +1,3 @@
-## Info
-
-# 1 tick is a week
-
-# things that are not transfered to this file:
-
-# - the values for the mortgage system
-# - the values for some of the banking (deposit and loan thresholds)
-# - the start times of different actions (such as households paying rent, frims selling goods 
-# and paying wages)
-
-# it is important (for now) that the number of households is 
-# divisible by the number of small firms (for the sake of distributing them)
-
 ## General (model.py)
 
 EDUCATION_COUNTS: 
@@ -56,6 +42,10 @@ FRIM_STARTING_GOODS:
   SMALL: 0
   MEDIUM: 0
   LARGE: 0
+SHARE_OF_PRODUCTION_CAPACITY:
+  - 0.54
+  - 0.29
+  - 0.17
 
 # Bank
 

@@ -2,7 +2,7 @@ import mesa
 from mesa.time import BaseScheduler
 from mesa.datacollection import DataCollector
 from .agents import Household, Bank, Government, LargeFirm, MediumFirm, SmallFirm
-from .utils import get, get_all, avg, split_households
+from .utils import get, get_all, avg, split_agents
 import itertools
 import yaml
 
@@ -65,10 +65,13 @@ class MacroModel(mesa.Model):
         self.schedule.add(Bank(next(id_giver), self))
         for _ in range(data["NUM_FIRMS"]["LARGE"]):
             self.schedule.add(LargeFirm(next(id_giver), self))
-        for _ in range(data["NUM_FIRMS"]["MEDIUM"]):
-            self.schedule.add(MediumFirm(next(id_giver), self))
 
-        self.household_ranges = split_households(data["NUM_HOUSEHOLDS"], data["NUM_FIRMS"]["SMALL"])
+        self.small_firm_ranges = split_agents(data["NUM_FIRMS"]["SMALL"], data["NUM_FIRMS"]["MEDIUM"])
+
+        for i in range(data["NUM_FIRMS"]["MEDIUM"]):
+            self.schedule.add(MediumFirm(next(id_giver), self, self.small_firm_ranges[i]))
+
+        self.household_ranges = split_agents(data["NUM_HOUSEHOLDS"], data["NUM_FIRMS"]["SMALL"])
         
         for i in range(data["NUM_FIRMS"]["SMALL"]):
             self.schedule.add(SmallFirm(next(id_giver), self, self.household_ranges[i]))
