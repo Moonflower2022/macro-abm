@@ -7,6 +7,7 @@ import yaml
 with open("src/configuration.yaml", "r") as file:
     data = yaml.safe_load(file)
 
+data["TOTAL_GOODS_PRODUCED"] = data["GOODS_PRODUCED"] + data["EXPORT_QUANTITY"]
 
 class Bank(mesa.Agent):
     loan_ticks = data["LOAN_TICKS"]
