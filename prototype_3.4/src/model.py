@@ -66,6 +66,8 @@ class MacroModel(mesa.Model):
     def __init__(self, total_steps=data["TOTAL_STEPS"]):
         super().__init__()
 
+        self.total_money = data["HOUSEHOLD_STARTING_MONEY"] * data["NUM_HOUSEHOLDS"] + sum([num_firms * firm_money for (num_firms, firm_money) in zip(data["NUM_FIRMS"].values(), data["FIRM_STARTING_MONEY"].values())])
+
         self.total_steps = total_steps
         self.schedule = BaseScheduler(self)
 

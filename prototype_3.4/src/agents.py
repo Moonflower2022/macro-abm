@@ -140,7 +140,9 @@ class Household(BaseAgent):
         quantity = data["TOTAL_IMPORT_QUANTITY"] / data["NUM_HOUSEHOLDS"]
 
         self.goods_requirement -= quantity
-        self.money -= data["IMPORT_PRICE"] * quantity
+        amount = data["IMPORT_PRICE"] * quantity
+        self.money -= amount
+        self.model.total_money -= amount
 
     def get_goods_requirement(self):
         return abs(self.goods_requirement - self.goods)
@@ -241,6 +243,10 @@ class Government(BaseAgent):
 
         self.money = data["GOVERNMENT_STARTING_MONEY"]
 
+    def provide_money(self, household, price, weekly_temporal_discount_rate, quantity):
+        amount = price * (1 - weekly_temporal_discount_rate) * quantity
+        household.money += amount
+        self.model.total_money += amount
 
 class Firm(BaseAgent):
     goods_interval = data["GOODS_INTERVAL"]
@@ -319,6 +325,9 @@ class Firm(BaseAgent):
         for customer in self.customers:
             quantity = customer.get_goods_requirement()
 
+            if isinstance(self, SmallFirm):
+                self.government.provide_money(customer, self.goods_price, customer.weekly_temporal_discount_rate, quantity)
+
             price = (
                 self.goods_cost
                 * self.fraction_production()
@@ -361,8 +370,8 @@ class LargeFirm(Firm):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
 
-        self.money = data["FRIM_STARTING_MONEY"]["LARGE"]
-        self.goods = data["FRIM_STARTING_GOODS"]["LARGE"]
+        self.money = data["FIRM_STARTING_MONEY"]["LARGE"]
+        self.goods = data["FIRM_STARTING_MONEY"]["LARGE"]
 
         self.month_goods_quantity = 0
 
@@ -387,8 +396,8 @@ class MediumFirm(Firm):
     def __init__(self, unique_id, model, customer_range):
         super().__init__(unique_id, model)
 
-        self.money = data["FRIM_STARTING_MONEY"]["MEDIUM"]
-        self.goods = data["FRIM_STARTING_GOODS"]["MEDIUM"]
+        self.money = data["FIRM_STARTING_MONEY"]["MEDIUM"]
+        self.goods = data["FIRM_STARTING_MONEY"]["MEDIUM"]
         self.customer_range = customer_range
         
         self.month_goods_quantity = 0
@@ -411,8 +420,8 @@ class SmallFirm(Firm):
 
     def __init__(self, unique_id, model, customer_range):
         super().__init__(unique_id, model)
-        self.money = data["FRIM_STARTING_MONEY"]["SMALL"]
-        self.goods = data["FRIM_STARTING_GOODS"]["SMALL"]
+        self.money = data["FIRM_STARTING_MONEY"]["SMALL"]
+        self.goods = data["FIRM_STARTING_MONEY"]["SMALL"]
         self.customer_range = customer_range
 
         self.month_goods_quantity = 0
@@ -425,13 +434,16 @@ class SmallFirm(Firm):
         self.customers = get_all(self.model, Household)[
             self.customer_range[0] : self.customer_range[1]
         ]
+        self.government = get(self.model, Government)
 
     def export(self):
         if self.goods < self.export_quantity:
             print("small firm goods:", self.goods)
             raise Exception(f"small firm {self} doesn't have enough goods to export")
         
-        self.money += self.export_quantity * data["EXPORT_PRICE"]
+        amount = self.export_quantity * data["EXPORT_PRICE"]
+        self.money += amount
+        self.model.total_money += amount
         self.goods -= self.export_quantity
         return self.export_quantity
 
