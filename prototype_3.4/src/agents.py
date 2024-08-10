@@ -7,9 +7,15 @@ import yaml
 with open("src/configuration.yaml", "r") as file:
     data = yaml.safe_load(file)
 
-data["TOTAL_GOODS_PRODUCED"] = data["GOODS_PRODUCED"] + data["EXPORT_QUANTITY"]
+data["TOTAL_GOODS_PRODUCED"] = data["GOODS_PRODUCED"] + data["TOTAL_EXPORT_QUANTITY"]
 
-class Bank(mesa.Agent):
+
+class BaseAgent(mesa.Agent):
+    def get_references(self):
+        pass
+
+
+class Bank(BaseAgent):
     loan_ticks = data["LOAN_TICKS"]
     monthly_interest_rate = data["MONTHLY_INTEREST_RATE"]
     compound_interval = data["COMPOUND_INTERVAL"]
@@ -85,7 +91,7 @@ class Bank(mesa.Agent):
                     raise Exception("bank defaulted :(")
 
 
-class Household(mesa.Agent):
+class Household(BaseAgent):
     rent_interval = data["RENT_INTERVAL"]
     mortgage_interval = data["MORTGAGE_INTERVAL"]
     utilities_interval = data["UTILITIES_INTERVAL"]
@@ -98,6 +104,7 @@ class Household(mesa.Agent):
     weekly_goods_consumption = data["WEEKLY_GOODS_CONSUMPTION"]
     weekly_goods_consumption_range = data["WEEKLY_GOODS_CONSUMPTION_RANGE"]
     monthly_mortgage_rate = data["MONTHLY_MORTGAGE_RATE"]
+    weekly_temporal_discount_rate = data["WEEKLY_TEMPORAL_DISCOUNT_RATE"]
 
     def __init__(self, unique_id, model, education):
         super().__init__(unique_id, model)
@@ -127,9 +134,16 @@ class Household(mesa.Agent):
             self.weekly_goods_consumption + self.weekly_goods_consumption_range
         )
 
-        self.goods_requirement = max(
-            random.uniform(lower_bound, upper_bound) - self.goods, 0
-        )
+        self.goods_requirement = random.uniform(lower_bound, upper_bound)
+
+    def buy_imported_goods(self):
+        quantity = data["TOTAL_IMPORT_QUANTITY"] / data["NUM_HOUSEHOLDS"]
+
+        self.goods_requirement -= quantity
+        self.money -= data["IMPORT_PRICE"] * quantity
+
+    def get_goods_requirement(self):
+        return abs(self.goods_requirement - self.goods)
 
     def pay_rent(self):
         self.money -= self.rent
@@ -218,16 +232,17 @@ class Household(mesa.Agent):
         """
         self.goods -= self.goods_requirement
         self.set_goods_requirement()
+        self.buy_imported_goods()
 
 
-class Government(mesa.Agent):
+class Government(BaseAgent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
 
         self.money = data["GOVERNMENT_STARTING_MONEY"]
 
 
-class Firm(mesa.Agent):
+class Firm(BaseAgent):
     goods_interval = data["GOODS_INTERVAL"]
     wages_interval = data["WAGES_INTERVAL"]
 
@@ -280,32 +295,34 @@ class Firm(mesa.Agent):
             / self.required_employees[education]
         )
 
-    def maximum_capacity_monthly_production_quantity(self):
-        return self.goods_requirement * 4
-
     def pay_wages(self):
+        print("firm:", self, "month_good_quantity:", self.month_goods_quantity, "money:", self.money)
         for education_class in self.employees:
             for worker in education_class:
                 wage = (
-                    self.maximum_capacity_monthly_production_quantity()
+                    self.month_goods_quantity
                     * data["VALUE_ADDED"]
                     * self.employee_fraction_production(worker.education)
                 )
-                print("type:", worker)
-                print("wage:", wage)
                 if self.money < wage:
                     raise Exception(f"Firm defaulted. ID: {self.unique_id}, {self}")
                 worker.money += wage
                 self.money -= wage
 
+    def get_goods_requirement(self):
+        print("firm:", self, "customers requirements:", [customer.get_goods_requirement() for customer in self.customers], "goods:", self.goods)
+        return abs(sum([customer.get_goods_requirement() for customer in self.customers]) - self.goods + self.export_quantity + 0.000000000001)
+
     def sell_goods(self):
         total_quantity = 0
 
         for customer in self.customers:
+            quantity = customer.get_goods_requirement()
+
             price = (
                 self.goods_cost
                 * self.fraction_production()
-                * customer.goods_requirement
+                * quantity
             )
 
             if customer.money < price:
@@ -313,32 +330,33 @@ class Firm(mesa.Agent):
             customer.money -= price
             self.money += price
 
-            if self.goods < customer.goods_requirement:
+            if self.goods < quantity:
                 raise Exception(f"supplier {self} doesnt have enough goods to provide")
 
-            customer.goods += customer.goods_requirement
-            self.goods -= customer.goods_requirement
+            customer.goods += quantity
+            self.goods -= quantity
 
-            total_quantity += customer.goods_requirement
+            total_quantity += quantity
 
         return total_quantity
 
     def step(self):
         if self.model.schedule.time == 0:
-            self.get_references()
             self.init_employees()
 
         if time_due(self.model, 0, self.goods_interval):
-            self.sell_goods()
+            self.month_goods_quantity += self.sell_goods()
 
         if time_due(self.model, 4, self.wages_interval):
             self.pay_wages()
+            self.month_goods_quantity = 0
 
 
 class LargeFirm(Firm):
     goods_cost = data["VALUE_ADDED"]
     required_employees = data["REQUIRED_EMPLOYEES"]["LARGE"]
     goods_requirement = data["TOTAL_GOODS_PRODUCED"]
+    export_quantity = data["TOTAL_EXPORT_QUANTITY"]
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
@@ -346,12 +364,14 @@ class LargeFirm(Firm):
         self.money = data["FRIM_STARTING_MONEY"]["LARGE"]
         self.goods = data["FRIM_STARTING_GOODS"]["LARGE"]
 
+        self.month_goods_quantity = 0
+
     def get_references(self):
         super().get_references()
         self.customers = get_all(self.model, MediumFirm)
 
     def acquire_goods(self):
-        self.goods += self.goods_requirement
+        self.goods += self.get_goods_requirement()
 
     def step(self):
         self.acquire_goods()
@@ -362,6 +382,7 @@ class MediumFirm(Firm):
     goods_cost = LargeFirm.goods_cost + data["VALUE_ADDED"]
     required_employees = data["REQUIRED_EMPLOYEES"]["MEDIUM"]
     goods_requirement = LargeFirm.goods_requirement / data["NUM_FIRMS"]["MEDIUM"]
+    export_quantity = data["TOTAL_EXPORT_QUANTITY"] / data["NUM_FIRMS"]["MEDIUM"]
 
     def __init__(self, unique_id, model, customer_range):
         super().__init__(unique_id, model)
@@ -369,6 +390,8 @@ class MediumFirm(Firm):
         self.money = data["FRIM_STARTING_MONEY"]["MEDIUM"]
         self.goods = data["FRIM_STARTING_GOODS"]["MEDIUM"]
         self.customer_range = customer_range
+        
+        self.month_goods_quantity = 0
 
     def get_references(self):
         super().get_references()
@@ -384,6 +407,7 @@ class SmallFirm(Firm):
     goods_cost = MediumFirm.goods_cost + data["VALUE_ADDED"]
     required_employees = data["REQUIRED_EMPLOYEES"]["SMALL"]
     goods_requirement = LargeFirm.goods_requirement / data["NUM_FIRMS"]["SMALL"]
+    export_quantity = data["TOTAL_EXPORT_QUANTITY"] / data["NUM_FIRMS"]["SMALL"]
 
     def __init__(self, unique_id, model, customer_range):
         super().__init__(unique_id, model)
@@ -391,16 +415,33 @@ class SmallFirm(Firm):
         self.goods = data["FRIM_STARTING_GOODS"]["SMALL"]
         self.customer_range = customer_range
 
+        self.month_goods_quantity = 0
+
+    def get_goods_requirement(self):
+        return self.goods_requirement - self.goods
+
     def get_references(self):
         super().get_references()
         self.customers = get_all(self.model, Household)[
             self.customer_range[0] : self.customer_range[1]
         ]
 
-    def sell_extra(self):
-        self.money += self.goods * self.goods_cost * self.fraction_production()
-        self.goods = 0
+    def export(self):
+        if self.goods < self.export_quantity:
+            print("small firm goods:", self.goods)
+            raise Exception(f"small firm {self} doesn't have enough goods to export")
+        
+        self.money += self.export_quantity * data["EXPORT_PRICE"]
+        self.goods -= self.export_quantity
+        return self.export_quantity
 
     def step(self):
-        super().step()
-        self.sell_extra()
+        if self.model.schedule.time == 0:
+            self.init_employees()
+
+        if time_due(self.model, 0, self.goods_interval):
+            self.month_goods_quantity += self.sell_goods() + self.export()
+
+        if time_due(self.model, 4, self.wages_interval):
+            self.pay_wages()
+            self.month_goods_quantity = 0

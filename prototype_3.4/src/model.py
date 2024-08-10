@@ -18,13 +18,22 @@ def get_government_money(model):
 def get_avg_large_firm_money(model):
     return avg([firm.money for firm in get_all(model, LargeFirm)])
 
+def get_avg_large_firm_goods(model):
+    return avg([firm.goods for firm in get_all(model, LargeFirm)])
+
 
 def get_avg_medium_firm_money(model):
     return avg([firm.money for firm in get_all(model, MediumFirm)])
 
+def get_avg_medium_firm_goods(model):
+    return avg([firm.goods for firm in get_all(model, MediumFirm)])
+
 
 def get_avg_small_firm_money(model):
     return avg([firm.money for firm in get_all(model, SmallFirm)])
+
+def get_avg_small_firm_goods(model):
+    return avg([firm.goods for firm in get_all(model, SmallFirm)])
 
 
 def get_total_household_money(model):
@@ -79,6 +88,9 @@ class MacroModel(mesa.Model):
         for i in range(self.household_num):
             self.schedule.add(Household(next(id_giver), self, self.educations[i]))
 
+        for agent in self.schedule.agents:
+            agent.get_references()
+
         unique_educations = list(set(self.educations))
 
         data_collectors = {}
@@ -106,9 +118,12 @@ class MacroModel(mesa.Model):
         data_collectors.update(
             {
                 "Bank Money": get_bank_money,
-                "Large Firm Money": get_avg_large_firm_money,
-                "Medium Firm Money": get_avg_medium_firm_money,
-                "Small Firm Money": get_avg_small_firm_money,
+                "Large Firm Avg Money": get_avg_large_firm_money,
+                "Medium Firm Avg Money": get_avg_medium_firm_money,
+                "Small Firm Avg Money": get_avg_small_firm_money,
+                "Large Firm Avg Goods": get_avg_large_firm_goods,
+                "Medium Firm Avg Goods": get_avg_medium_firm_goods,
+                "Small Firm Avg Goods": get_avg_small_firm_goods,
                 "Government Money": get_government_money,
                 "Total Household Money": get_total_household_money,
                 "Avg Household Money": get_avg_household_money,
