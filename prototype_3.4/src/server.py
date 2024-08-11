@@ -7,7 +7,7 @@ FIRM_COLORS = ["#12fe1e", "#f14b5a", "#000000"]
 
 chart = ChartModule(
     [
-        {"Label": "Bank Money", "Color": "#2ca02c"},
+        #{"Label": "Bank Money", "Color": "#2ca02c"},
         {"Label": "Large Firm Avg Money", "Color": FIRM_COLORS[2]},
         {"Label": "Medium Firm Avg Money", "Color": FIRM_COLORS[1]},
         {"Label": "Small Firm Avg Money", "Color": FIRM_COLORS[0]},
@@ -38,4 +38,4 @@ total_steps = 100
 server = mesa.visualization.ModularServer(
     MacroModel, [chart, chart2, chart3], "Macro Model", {"total_steps": total_steps}
 )
-server.port = 8521
+server.port = 8520

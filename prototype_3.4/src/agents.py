@@ -145,7 +145,7 @@ class Household(BaseAgent):
         self.model.total_money -= amount
 
     def get_goods_requirement(self):
-        return abs(self.goods_requirement - self.goods)
+        return max(self.goods_requirement - self.goods, 0)
 
     def pay_rent(self):
         self.money -= self.rent
@@ -317,7 +317,7 @@ class Firm(BaseAgent):
 
     def get_goods_requirement(self):
         print("firm:", self, "customers requirements:", [customer.get_goods_requirement() for customer in self.customers], "goods:", self.goods)
-        return abs(sum([customer.get_goods_requirement() for customer in self.customers]) - self.goods + self.export_quantity + 0.000000000001)
+        return max(sum([customer.get_goods_requirement() for customer in self.customers]) - self.goods + self.export_quantity + 0.000000000001, 0)
 
     def sell_goods(self):
         total_quantity = 0
@@ -326,7 +326,7 @@ class Firm(BaseAgent):
             quantity = customer.get_goods_requirement()
 
             if isinstance(self, SmallFirm):
-                self.government.provide_money(customer, self.goods_price, customer.weekly_temporal_discount_rate, quantity)
+                self.government.provide_money(customer, self.goods_cost, customer.weekly_temporal_discount_rate, quantity)
 
             price = (
                 self.goods_cost
@@ -371,7 +371,7 @@ class LargeFirm(Firm):
         super().__init__(unique_id, model)
 
         self.money = data["FIRM_STARTING_MONEY"]["LARGE"]
-        self.goods = data["FIRM_STARTING_MONEY"]["LARGE"]
+        self.goods = data["FIRM_STARTING_GOODS"]["LARGE"]
 
         self.month_goods_quantity = 0
 
@@ -397,7 +397,7 @@ class MediumFirm(Firm):
         super().__init__(unique_id, model)
 
         self.money = data["FIRM_STARTING_MONEY"]["MEDIUM"]
-        self.goods = data["FIRM_STARTING_MONEY"]["MEDIUM"]
+        self.goods = data["FIRM_STARTING_GOODS"]["MEDIUM"]
         self.customer_range = customer_range
         
         self.month_goods_quantity = 0
@@ -421,13 +421,13 @@ class SmallFirm(Firm):
     def __init__(self, unique_id, model, customer_range):
         super().__init__(unique_id, model)
         self.money = data["FIRM_STARTING_MONEY"]["SMALL"]
-        self.goods = data["FIRM_STARTING_MONEY"]["SMALL"]
+        self.goods = data["FIRM_STARTING_GOODS"]["SMALL"]
         self.customer_range = customer_range
 
         self.month_goods_quantity = 0
 
     def get_goods_requirement(self):
-        return self.goods_requirement - self.goods
+        return max(self.goods_requirement - self.goods, 0)
 
     def get_references(self):
         super().get_references()
