@@ -47,6 +47,9 @@ def get_avg_household_money(model):
 def get_household_deposits(model):
     return sum(info["amount"] for info in get(model, Bank).deposits.values())
 
+def get_inflation_rate(model):
+    return 1 + get(model, Government).total_money_provided / model.total_money
+
 
 # load configuration file's variables
 with open("src/configuration.yaml", "r") as file:
@@ -130,6 +133,7 @@ class MacroModel(mesa.Model):
                 "Total Household Money": get_total_household_money,
                 "Avg Household Money": get_avg_household_money,
                 "Total Household Deposits": get_household_deposits,
+                "Inflation Rate": get_inflation_rate,
             }
         )
 

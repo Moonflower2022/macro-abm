@@ -33,9 +33,15 @@ chart3 = ChartModule(
     ]
 )
 
+chart4 = ChartModule(
+    [
+        {"Label": "Inflation Rate", "Color": "#000000"}
+    ]
+)
+
 total_steps = 100
 
 server = mesa.visualization.ModularServer(
-    MacroModel, [chart, chart2, chart3], "Macro Model", {"total_steps": total_steps}
+    MacroModel, [chart, chart2, chart3, chart4], "Macro Model", {"total_steps": total_steps}
 )
 server.port = 8520
