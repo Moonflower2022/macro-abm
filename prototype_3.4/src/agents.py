@@ -238,11 +238,15 @@ class Household(BaseAgent):
 
 
 class Government(BaseAgent):
+    inflation_interval = data["INFLATION_INTERVAL"]
+
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
 
         self.money = data["GOVERNMENT_STARTING_MONEY"]
         self.total_money_provided = 0
+
+        self.compounded_inflation_rate = 1
 
     def get_references(self):
         self.initial_total_money = self.model.total_money
@@ -255,6 +259,10 @@ class Government(BaseAgent):
 
     def get_inflation_factor(self):
         return 1 + (self.total_money_provided / self.initial_total_money)
+    
+    def step(self):
+        if time_due(self.model, 0, self.inflation_interval):
+            self.compounded_inflation_rate *= self.get_inflation_factor()
 
 class Firm(BaseAgent):
     goods_interval = data["GOODS_INTERVAL"]
@@ -264,12 +272,9 @@ class Firm(BaseAgent):
         super().__init__(unique_id, model)
         self.employee_counts = [0, 0, 0]
         self.employees = [[] for _ in range(3)]
+
         self.current_inflation_rate = 1
         self.previous_inflation_rate = 1
-
-    def update_inflation_rate(self):
-        self.previous_inflation_rate = self.current_inflation_rate
-        self.current_inflation_rate = self.government.get_inflation_factor()
 
     def get_references(self):
         self.households = get_all(self.model, Household)
@@ -320,16 +325,16 @@ class Firm(BaseAgent):
         print("firm:", self, "month_good_quantity:", self.month_goods_quantity, "money:", self.money)
         for education_class in self.employees:
             for worker in education_class:
-                base_wage = (
+                wage = (
                     self.month_goods_quantity
                     * data["VALUE_ADDED"]
                     * self.employee_fraction_production(worker.education)
+                    * self.government.compounded_inflation_rate
                 )
-                adjusted_wage = base_wage * self.previous_inflation_rate
-                if self.money < adjusted_wage:
+                if self.money < wage:
                     raise Exception(f"Firm defaulted. ID: {self.unique_id}, {self}")
-                worker.money += adjusted_wage
-                self.money -= adjusted_wage
+                worker.money += wage
+                self.money -= wage
 
     def get_goods_requirement(self):
         print("firm:", self, "customers requirements:", [customer.get_goods_requirement() for customer in self.customers], "goods:", self.goods)
@@ -345,9 +350,10 @@ class Firm(BaseAgent):
                 self.government.provide_money(customer, self.goods_cost, customer.weekly_temporal_discount_rate, quantity)
 
             price = (
-                self.goods_cost
+                self.base_goods_cost
                 * self.fraction_production()
                 * quantity
+                * self.government.compounded_inflation_rate
             )
 
             if customer.money < price:
@@ -369,8 +375,6 @@ class Firm(BaseAgent):
         if self.model.schedule.time == 0:
             self.init_employees()
 
-        self.update_inflation_rate()
-
         if time_due(self.model, 0, self.goods_interval):
             self.month_goods_quantity += self.sell_goods()
 
@@ -380,7 +384,8 @@ class Firm(BaseAgent):
 
 
 class LargeFirm(Firm):
-    goods_cost = data["VALUE_ADDED"]
+    base_goods_cost = data["VALUE_ADDED"]
+
     required_employees = data["REQUIRED_EMPLOYEES"]["LARGE"]
     goods_requirement = data["TOTAL_GOODS_PRODUCED"]
     export_quantity = data["TOTAL_EXPORT_QUANTITY"]
@@ -406,7 +411,8 @@ class LargeFirm(Firm):
 
 
 class MediumFirm(Firm):
-    goods_cost = LargeFirm.goods_cost + data["VALUE_ADDED"]
+    base_goods_cost = LargeFirm.base_goods_cost + data["VALUE_ADDED"]
+
     required_employees = data["REQUIRED_EMPLOYEES"]["MEDIUM"]
     goods_requirement = LargeFirm.goods_requirement / data["NUM_FIRMS"]["MEDIUM"]
     export_quantity = data["TOTAL_EXPORT_QUANTITY"] / data["NUM_FIRMS"]["MEDIUM"]
@@ -431,11 +437,8 @@ class MediumFirm(Firm):
 
 
 class SmallFirm(Firm):
-    @property
-    def goods_cost(self):
-        base_cost = MediumFirm.goods_cost + data["VALUE_ADDED"]
-        inflation_factor = self.government.get_inflation_factor()
-        return base_cost * inflation_factor
+    base_goods_cost = MediumFirm.base_goods_cost + data["VALUE_ADDED"]
+
     required_employees = data["REQUIRED_EMPLOYEES"]["SMALL"]
     goods_requirement = LargeFirm.goods_requirement / data["NUM_FIRMS"]["SMALL"]
     export_quantity = data["TOTAL_EXPORT_QUANTITY"] / data["NUM_FIRMS"]["SMALL"]
@@ -447,6 +450,8 @@ class SmallFirm(Firm):
         self.customer_range = customer_range
 
         self.month_goods_quantity = 0
+
+        self.goods_cost = self.base_goods_cost
 
     def get_goods_requirement(self):
         return max(self.goods_requirement - self.goods, 0)
