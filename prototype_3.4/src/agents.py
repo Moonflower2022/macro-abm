@@ -115,6 +115,7 @@ class Household(BaseAgent):
         self.money = data["HOUSEHOLD_STARTING_MONEY"]
         self.goods = data["HOUSEHOLD_STARTING_GOODS"]
         self.set_goods_requirement()
+        self.buy_imported_goods()
 
         self.strategy = data["HOUSEHOLD_STARTING_STRATEGY"]
         self.strategy_start = 0
@@ -232,6 +233,10 @@ class Household(BaseAgent):
         if self.model.schedule.time == 14 * 4:  # 14 months
             self.buy_house()
         """
+        if self.goods < self.goods_requirement:
+            raise Exception(
+                f"household {self} does not have enough food to consume at the end of the week"
+            )
         self.goods -= self.goods_requirement
         self.set_goods_requirement()
         self.buy_imported_goods()
@@ -259,10 +264,12 @@ class Government(BaseAgent):
 
     def get_inflation_factor(self):
         return 1 + (self.total_money_provided / self.initial_total_money)
-    
+
     def step(self):
         if time_due(self.model, 0, self.inflation_interval):
             self.compounded_inflation_rate *= self.get_inflation_factor()
+            print("\ninflation rate:", self.compounded_inflation_rate, "\n")
+
 
 class Firm(BaseAgent):
     goods_interval = data["GOODS_INTERVAL"]
@@ -276,6 +283,8 @@ class Firm(BaseAgent):
         super().__init__(unique_id, model)
         self.employee_counts = [0, 0, 0]
         self.employees = [[] for _ in range(3)]
+
+        self.monthly_inflation_rate_sum = 0
 
     def get_references(self):
         self.households = get_all(self.model, Household)
@@ -323,14 +332,24 @@ class Firm(BaseAgent):
         )
 
     def pay_wages(self):
-        print("firm:", self, "month_good_quantity:", self.month_goods_quantity, "money:", self.money)
+        print(
+            "firm:",
+            self,
+            "month_good_quantity:",
+            self.month_goods_quantity,
+            "monthly_inflation_rate_sum:",
+            self.monthly_inflation_rate_sum,
+            "money:",
+            self.money,
+        )
         for education_class in self.employees:
             for worker in education_class:
                 wage = (
                     self.month_goods_quantity
                     * data["VALUE_ADDED"]
                     * self.employee_fraction_production(worker.education)
-                    * self.government.compounded_inflation_rate
+                    * self.monthly_inflation_rate_sum
+                    / 4
                 )
                 if self.money < wage:
                     raise Exception(f"Firm defaulted. ID: {self.unique_id}, {self}")
@@ -338,8 +357,28 @@ class Firm(BaseAgent):
                 self.money -= wage
 
     def get_goods_requirement(self):
-        print("firm:", self, "customers requirements:", [customer.get_goods_requirement() for customer in self.customers], "goods:", self.goods)
-        return max(sum([customer.get_goods_requirement() for customer in self.customers]) - self.goods + self.export_quantity + 0.000000000001, 0)
+        print(
+            "firm:",
+            self,
+            "customers requirements:",
+            [customer.get_goods_requirement() for customer in self.customers],
+            "goods:",
+            self.goods,
+            "requirement:",
+            max(
+                sum([customer.get_goods_requirement() for customer in self.customers])
+                - self.goods
+                + self.export_quantity,
+                0,
+            ),
+        )
+        return max(
+            sum([customer.get_goods_requirement() for customer in self.customers])
+            - self.goods
+            + self.export_quantity
+            + 0.0000001, # for rounding problem preventation
+            0,
+        )
 
     def sell_goods(self):
         total_quantity = 0
@@ -348,12 +387,18 @@ class Firm(BaseAgent):
             quantity = customer.get_goods_requirement()
 
             if isinstance(self, SmallFirm):
-                self.government.provide_money(customer, self.goods_cost, customer.weekly_temporal_discount_rate, quantity)
+                self.government.provide_money(
+                    customer,
+                    self.goods_cost,
+                    customer.weekly_temporal_discount_rate,
+                    quantity,
+                )
 
             price = (
                 self.goods_cost
                 * self.fraction_production()
                 * quantity
+                * self.government.compounded_inflation_rate
             )
 
             if customer.money < price:
@@ -372,15 +417,23 @@ class Firm(BaseAgent):
         return total_quantity
 
     def step(self):
+        if isinstance(self, LargeFirm):
+            self.acquire_goods()
+
         if self.model.schedule.time == 0:
             self.init_employees()
 
         if time_due(self.model, 0, self.goods_interval):
-            self.month_goods_quantity += self.sell_goods()
+            self.month_goods_quantity += self.sell_goods() + (
+                0 if not isinstance(self, SmallFirm) else self.export()
+            )
+            print("\nadded amount:", self.government.compounded_inflation_rate, "\n")
+            self.monthly_inflation_rate_sum += self.government.compounded_inflation_rate
 
-        if time_due(self.model, 4, self.wages_interval):
+        if time_due(self.model, 3, self.wages_interval):
             self.pay_wages()
             self.month_goods_quantity = 0
+            self.monthly_inflation_rate_sum = 0
 
 
 class LargeFirm(Firm):
@@ -405,10 +458,6 @@ class LargeFirm(Firm):
     def acquire_goods(self):
         self.goods += self.get_goods_requirement()
 
-    def step(self):
-        self.acquire_goods()
-        super().step()
-
 
 class MediumFirm(Firm):
     base_goods_cost = LargeFirm.base_goods_cost + data["VALUE_ADDED"]
@@ -423,7 +472,7 @@ class MediumFirm(Firm):
         self.money = data["FIRM_STARTING_MONEY"]["MEDIUM"]
         self.goods = data["FIRM_STARTING_GOODS"]["MEDIUM"]
         self.customer_range = customer_range
-        
+
         self.month_goods_quantity = 0
 
     def get_references(self):
@@ -431,9 +480,6 @@ class MediumFirm(Firm):
         self.customers = get_all(self.model, SmallFirm)[
             self.customer_range[0] : self.customer_range[1]
         ]
-
-    def step(self):
-        super().step()
 
 
 class SmallFirm(Firm):
@@ -451,8 +497,8 @@ class SmallFirm(Firm):
 
         self.month_goods_quantity = 0
 
-    def get_goods_requirement(self):
-        return max(self.goods_requirement - self.goods, 0)
+    # def get_goods_requirement(self):
+    #    return max(self.goods_requirement - self.goods, 0)
 
     def get_references(self):
         super().get_references()
@@ -465,20 +511,9 @@ class SmallFirm(Firm):
         if self.goods < self.export_quantity:
             print("small firm goods:", self.goods)
             raise Exception(f"small firm {self} doesn't have enough goods to export")
-        
+
         amount = self.export_quantity * data["EXPORT_PRICE"]
         self.money += amount
         self.model.total_money += amount
         self.goods -= self.export_quantity
         return self.export_quantity
-
-    def step(self):
-        if self.model.schedule.time == 0:
-            self.init_employees()
-
-        if time_due(self.model, 0, self.goods_interval):
-            self.month_goods_quantity += self.sell_goods() + self.export()
-
-        if time_due(self.model, 4, self.wages_interval):
-            self.pay_wages()
-            self.month_goods_quantity = 0
