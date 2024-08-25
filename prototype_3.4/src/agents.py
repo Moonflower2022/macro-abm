@@ -268,13 +268,14 @@ class Firm(BaseAgent):
     goods_interval = data["GOODS_INTERVAL"]
     wages_interval = data["WAGES_INTERVAL"]
 
+    @property
+    def goods_cost(self):
+        return self.base_goods_cost * self.government.compounded_inflation_rate
+
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
         self.employee_counts = [0, 0, 0]
         self.employees = [[] for _ in range(3)]
-
-        self.current_inflation_rate = 1
-        self.previous_inflation_rate = 1
 
     def get_references(self):
         self.households = get_all(self.model, Household)
@@ -350,10 +351,9 @@ class Firm(BaseAgent):
                 self.government.provide_money(customer, self.goods_cost, customer.weekly_temporal_discount_rate, quantity)
 
             price = (
-                self.base_goods_cost
+                self.goods_cost
                 * self.fraction_production()
                 * quantity
-                * self.government.compounded_inflation_rate
             )
 
             if customer.money < price:
@@ -450,8 +450,6 @@ class SmallFirm(Firm):
         self.customer_range = customer_range
 
         self.month_goods_quantity = 0
-
-        self.goods_cost = self.base_goods_cost
 
     def get_goods_requirement(self):
         return max(self.goods_requirement - self.goods, 0)

@@ -35,7 +35,8 @@ chart3 = ChartModule(
 
 chart4 = ChartModule(
     [
-        {"Label": "Inflation Rate", "Color": "#000000"}
+        {"Label": "Inflation Rate", "Color": "#000000"},
+        {"Label": "Compounded Inflation Rate", "Color": "#606060"}
     ]
 )
 
