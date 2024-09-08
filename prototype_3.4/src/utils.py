@@ -7,7 +7,7 @@ def test_is_whole():
     assert is_whole(1.2) == False
     assert is_whole(1.0) == True
 
-    print("\"is_int\" funciton testing passed")
+    print('"is_int" funciton testing passed')
 
 
 def get_all(model, agent_class):
@@ -49,7 +49,7 @@ def split_agents(num_agents, num_managers):
 
     num_agents_per_manager = num_agents / num_managers
     assert is_whole(num_agents_per_manager)
-    
+
     return [
         [int(num_agents_per_manager * i), int(num_agents_per_manager * (i + 1))]
         for i in range(num_managers)

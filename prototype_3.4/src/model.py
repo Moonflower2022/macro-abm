@@ -18,6 +18,7 @@ def get_government_money(model):
 def get_avg_large_firm_money(model):
     return avg([firm.money for firm in get_all(model, LargeFirm)])
 
+
 def get_avg_large_firm_goods(model):
     return avg([firm.goods for firm in get_all(model, LargeFirm)])
 
@@ -25,12 +26,14 @@ def get_avg_large_firm_goods(model):
 def get_avg_medium_firm_money(model):
     return avg([firm.money for firm in get_all(model, MediumFirm)])
 
+
 def get_avg_medium_firm_goods(model):
     return avg([firm.goods for firm in get_all(model, MediumFirm)])
 
 
 def get_avg_small_firm_money(model):
     return avg([firm.money for firm in get_all(model, SmallFirm)])
+
 
 def get_avg_small_firm_goods(model):
     return avg([firm.goods for firm in get_all(model, SmallFirm)])
@@ -47,8 +50,10 @@ def get_avg_household_money(model):
 def get_household_deposits(model):
     return sum(info["amount"] for info in get(model, Bank).deposits.values())
 
+
 def get_inflation_rate(model):
     return 1 + get(model, Government).total_money_provided / model.total_money
+
 
 def get_compounded_inflation_rate(model):
     return get(model, Government).compounded_inflation_rate
@@ -72,7 +77,16 @@ class MacroModel(mesa.Model):
     def __init__(self, total_steps=data["TOTAL_STEPS"]):
         super().__init__()
 
-        self.total_money = data["HOUSEHOLD_STARTING_MONEY"] * data["NUM_HOUSEHOLDS"] + sum([num_firms * firm_money for (num_firms, firm_money) in zip(data["NUM_FIRMS"].values(), data["FIRM_STARTING_MONEY"].values())])
+        self.total_money = data["HOUSEHOLD_STARTING_MONEY"] * data[
+            "NUM_HOUSEHOLDS"
+        ] + sum(
+            [
+                num_firms * firm_money
+                for (num_firms, firm_money) in zip(
+                    data["NUM_FIRMS"].values(), data["FIRM_STARTING_MONEY"].values()
+                )
+            ]
+        )
 
         self.total_steps = total_steps
         self.schedule = BaseScheduler(self)
@@ -83,13 +97,19 @@ class MacroModel(mesa.Model):
         for _ in range(data["NUM_FIRMS"]["LARGE"]):
             self.schedule.add(LargeFirm(next(id_giver), self))
 
-        self.small_firm_ranges = split_agents(data["NUM_FIRMS"]["SMALL"], data["NUM_FIRMS"]["MEDIUM"])
+        self.small_firm_ranges = split_agents(
+            data["NUM_FIRMS"]["SMALL"], data["NUM_FIRMS"]["MEDIUM"]
+        )
 
         for i in range(data["NUM_FIRMS"]["MEDIUM"]):
-            self.schedule.add(MediumFirm(next(id_giver), self, self.small_firm_ranges[i]))
+            self.schedule.add(
+                MediumFirm(next(id_giver), self, self.small_firm_ranges[i])
+            )
 
-        self.household_ranges = split_agents(data["NUM_HOUSEHOLDS"], data["NUM_FIRMS"]["SMALL"])
-        
+        self.household_ranges = split_agents(
+            data["NUM_HOUSEHOLDS"], data["NUM_FIRMS"]["SMALL"]
+        )
+
         for i in range(data["NUM_FIRMS"]["SMALL"]):
             self.schedule.add(SmallFirm(next(id_giver), self, self.household_ranges[i]))
 

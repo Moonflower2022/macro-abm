@@ -376,7 +376,7 @@ class Firm(BaseAgent):
             sum([customer.get_goods_requirement() for customer in self.customers])
             - self.goods
             + self.export_quantity
-            + 0.0000001, # for rounding problem preventation
+            + 0.0000001,  # for rounding problem preventation
             0,
         )
 
