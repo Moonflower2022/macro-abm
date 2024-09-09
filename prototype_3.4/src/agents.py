@@ -98,7 +98,7 @@ class Household(BaseAgent):
     goods_interval = data["GOODS_INTERVAL"]
 
     house_cost = data["HOUSE_COST"]
-    rent = data["RENT"]
+    rent_cost = data["RENT_COST"]
     utilities_cost = data["UTILITIES_COST"]
     mortgage_cost = data["MORTGAGE_COST"]
     weekly_goods_consumption = data["WEEKLY_GOODS_CONSUMPTION"]
@@ -114,8 +114,6 @@ class Household(BaseAgent):
 
         self.money = data["HOUSEHOLD_STARTING_MONEY"]
         self.goods = data["HOUSEHOLD_STARTING_GOODS"]
-        self.set_goods_requirement()
-        self.buy_imported_goods()
 
         self.strategy = data["HOUSEHOLD_STARTING_STRATEGY"]
         self.strategy_start = 0
@@ -126,6 +124,12 @@ class Household(BaseAgent):
         self.bank = get(self.model, Bank)
         self.government = get(self.model, Government)
         self.stores = get_all(self.model, SmallFirm)
+        self.after_references()
+
+    def after_references(self):
+        self.set_goods_requirement()
+        self.buy_imported_goods()
+
 
     def set_goods_requirement(self):
         lower_bound = (
@@ -141,7 +145,7 @@ class Household(BaseAgent):
         quantity = data["TOTAL_IMPORT_QUANTITY"] / data["NUM_HOUSEHOLDS"]
 
         self.goods_requirement -= quantity
-        amount = data["IMPORT_PRICE"] * quantity
+        amount = data["IMPORT_PRICE"] * quantity * self.government.compounded_inflation_rate
         self.money -= amount
         self.model.total_money -= amount
 
@@ -149,8 +153,8 @@ class Household(BaseAgent):
         return max(self.goods_requirement - self.goods, 0)
 
     def pay_rent(self):
-        self.money -= self.rent
-        self.bank.money += self.rent - self.utilities_cost
+        self.money -= self.rent_cost
+        self.bank.money += self.rent_cost - self.utilities_cost
         # bank should pay 20% of the rent to the government
         self.government.money += self.utilities_cost
 
@@ -187,9 +191,6 @@ class Household(BaseAgent):
         self.strategy_start = self.model.schedule.time
 
     def step(self):
-        if self.model.schedule.time == 0:
-            self.get_references()
-
         if self.strategy == "rent" and time_due(
             self.model, self.strategy_start, self.rent_interval
         ):
@@ -235,7 +236,7 @@ class Household(BaseAgent):
         """
         if self.goods < self.goods_requirement:
             raise Exception(
-                f"household {self} does not have enough food to consume at the end of the week"
+                f"household {self} does not have enough food to consume"
             )
         self.goods -= self.goods_requirement
         self.set_goods_requirement()
@@ -342,41 +343,32 @@ class Firm(BaseAgent):
             "money:",
             self.money,
         )
+    
+        total_wages = 0
+
         for education_class in self.employees:
             for worker in education_class:
                 wage = (
                     self.month_goods_quantity
                     * data["VALUE_ADDED"]
                     * self.employee_fraction_production(worker.education)
-                    * self.monthly_inflation_rate_sum
-                    / 4
+                    * (self.monthly_inflation_rate_sum / 4)
                 )
                 if self.money < wage:
-                    raise Exception(f"Firm defaulted. ID: {self.unique_id}, {self}")
+                    raise Exception(f"Firm {self} defaulted. ID: {self.unique_id}")
                 worker.money += wage
                 self.money -= wage
 
+                total_wages += wage
+
+        print(f"new money: {self.money}")
+
     def get_goods_requirement(self):
-        print(
-            "firm:",
-            self,
-            "customers requirements:",
-            [customer.get_goods_requirement() for customer in self.customers],
-            "goods:",
-            self.goods,
-            "requirement:",
-            max(
-                sum([customer.get_goods_requirement() for customer in self.customers])
-                - self.goods
-                + self.export_quantity,
-                0,
-            ),
-        )
         return max(
             sum([customer.get_goods_requirement() for customer in self.customers])
             - self.goods
-            + self.export_quantity
-            + 0.0000001,  # for rounding problem preventation
+            + (self.export_quantity if isinstance(self, SmallFirm) else 0)
+            + 1e-8,  # for rounding problem preventation
             0,
         )
 
@@ -427,7 +419,6 @@ class Firm(BaseAgent):
             self.month_goods_quantity += self.sell_goods() + (
                 0 if not isinstance(self, SmallFirm) else self.export()
             )
-            print("\nadded amount:", self.government.compounded_inflation_rate, "\n")
             self.monthly_inflation_rate_sum += self.government.compounded_inflation_rate
 
         if time_due(self.model, 3, self.wages_interval):
@@ -512,7 +503,7 @@ class SmallFirm(Firm):
             print("small firm goods:", self.goods)
             raise Exception(f"small firm {self} doesn't have enough goods to export")
 
-        amount = self.export_quantity * data["EXPORT_PRICE"]
+        amount = self.export_quantity * data["EXPORT_PRICE"] * self.government.compounded_inflation_rate
         self.money += amount
         self.model.total_money += amount
         self.goods -= self.export_quantity
