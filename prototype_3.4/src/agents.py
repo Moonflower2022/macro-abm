@@ -146,6 +146,7 @@ class Household(BaseAgent):
 
         self.goods_requirement -= quantity
         amount = data["IMPORT_PRICE"] * quantity * self.government.compounded_inflation_rate
+
         self.money -= amount
         self.model.total_money -= amount
 
@@ -354,6 +355,7 @@ class Firm(BaseAgent):
                     * self.employee_fraction_production(worker.education)
                     * (self.monthly_inflation_rate_sum / 4)
                 )
+                
                 if self.money < wage:
                     raise Exception(f"Firm {self} defaulted. ID: {self.unique_id}")
                 worker.money += wage
@@ -390,7 +392,6 @@ class Firm(BaseAgent):
                 self.goods_cost
                 * self.fraction_production()
                 * quantity
-                * self.government.compounded_inflation_rate
             )
 
             if customer.money < price:
