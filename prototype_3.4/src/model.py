@@ -1,8 +1,8 @@
 import mesa
 from mesa.time import BaseScheduler
 from mesa.datacollection import DataCollector
-from .agents import Household, Bank, Government, LargeFirm, MediumFirm, SmallFirm
-from .utils import get, get_all, avg, split_agents
+from src.agents import Household, Bank, Government, LargeFirm, MediumFirm, SmallFirm
+from src.utils import get, get_all, avg, split_agents
 import itertools
 import yaml
 

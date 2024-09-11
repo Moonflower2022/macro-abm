@@ -55,6 +55,10 @@ def split_agents(num_agents, num_managers):
         for i in range(num_managers)
     ]
 
+def get_firm_type_string(firm):
+    class_name = firm.__class__.__name__
+    return class_name[:-4].upper()
+
 
 if __name__ == "__main__":
     test_is_whole()

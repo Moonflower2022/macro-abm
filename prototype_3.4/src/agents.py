@@ -1,6 +1,6 @@
 import mesa
 import random
-from .utils import get, get_all, time_due
+from src.utils import get, get_all, time_due, get_firm_type_string
 import yaml
 
 # load configuration file's variables
@@ -408,6 +408,16 @@ class Firm(BaseAgent):
             total_quantity += quantity
 
         return total_quantity
+    
+    def update_baseline(self): # FOR LANDON AND SWAIN: HERE IS WHERE THE BASELINE MONEY IS BEING CHANGED
+        new_baseline = data["FIRM_STARTING_MONEY"][get_firm_type_string(self)] * self.government.compounded_inflation_rate
+        amount_added = new_baseline - self.baseline
+
+        self.money += amount_added
+
+        self.government.total_money_provided += amount_added
+
+        self.baseline = new_baseline
 
     def step(self):
         if isinstance(self, LargeFirm):
@@ -427,6 +437,8 @@ class Firm(BaseAgent):
             self.month_goods_quantity = 0
             self.monthly_inflation_rate_sum = 0
 
+        self.update_baseline()
+
 
 class LargeFirm(Firm):
     base_goods_cost = data["VALUE_ADDED"]
@@ -439,6 +451,7 @@ class LargeFirm(Firm):
         super().__init__(unique_id, model)
 
         self.money = data["FIRM_STARTING_MONEY"]["LARGE"]
+        self.baseline = self.money
         self.goods = data["FIRM_STARTING_GOODS"]["LARGE"]
 
         self.month_goods_quantity = 0
@@ -462,6 +475,7 @@ class MediumFirm(Firm):
         super().__init__(unique_id, model)
 
         self.money = data["FIRM_STARTING_MONEY"]["MEDIUM"]
+        self.baseline = self.money
         self.goods = data["FIRM_STARTING_GOODS"]["MEDIUM"]
         self.customer_range = customer_range
 
@@ -484,6 +498,7 @@ class SmallFirm(Firm):
     def __init__(self, unique_id, model, customer_range):
         super().__init__(unique_id, model)
         self.money = data["FIRM_STARTING_MONEY"]["SMALL"]
+        self.baseline = self.money
         self.goods = data["FIRM_STARTING_GOODS"]["SMALL"]
         self.customer_range = customer_range
 

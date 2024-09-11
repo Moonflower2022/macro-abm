@@ -1,6 +1,6 @@
 import mesa
 from mesa.visualization.modules import ChartModule
-from .model import MacroModel
+from src.model import MacroModel
 
 HOUSEHOLD_COLORS = ["#2596be", "#e28743", "#21130d"]
 FIRM_COLORS = ["#12fe1e", "#f14b5a", "#000000"]
